@@ -110,6 +110,13 @@ impl <'p> PakTree<'p> {
         Ok(results)
     }
     
+    pub fn get_greater_eq(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+        let pointer = self.meta.pages.get(&0).unwrap();
+        let mut results = HashSet::new();
+        self.get_greater_r(value, *pointer, &mut results, true)?;
+        Ok(results)
+    }
+    
     fn get_greater_r(&self, value : &PakValue, current_page : PakPointer, set : &mut HashSet<PakPointer>, match_eq : bool) -> PakResult<()> {
         let page : PakTreePage = self.pak.read_err(current_page)?;
         

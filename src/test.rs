@@ -147,7 +147,7 @@ fn pak_read() {
 fn pak_query_equal() {
     let pak = build_data_base();
     
-    let people = pak.query::<(Person,)>(PakQuery::equals("first_name", "John")).unwrap();
+    let people = pak.query::<(Person, )>(PakQuery::equals("first_name", "John")).unwrap();
     assert_eq!(people.len(), 2);
 }
 
@@ -169,4 +169,37 @@ fn pak_query_greater_than() {
     
     assert_eq!(people.len(), 5);
     assert_eq!(pets.len(), 0);
+}
+
+#[test]
+fn pak_query_greater_than_equal() {
+    let pak = build_data_base();
+    
+    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::greater_than_equal("age", 25)).unwrap();
+    
+    assert_eq!(people.len(), 6);
+    assert_eq!(pets.len(), 0);
+}
+
+#[test]
+fn pak_query_less_than_equal() {
+    let pak = build_data_base();
+    
+    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::less_than_equal("age", 25)).unwrap();
+    
+    assert_eq!(people.len(), 3);
+    assert_eq!(pets.len(), 3);
+}
+
+#[test]
+fn compound_union_query() {
+    let pak = build_data_base();
+    
+    let query = PakQuery::less_than("age", 30) | PakQuery::equals("first_name", "John");
+    let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
+    
+    println!("{people:?}");
+    
+    assert_eq!(people.len(), 4);
+    assert_eq!(pets.len(), 3);
 }

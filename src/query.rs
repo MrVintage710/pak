@@ -94,6 +94,8 @@ pub enum PakQuery {
     Equal(String, PakValue),
     GreaterThan(String, PakValue),
     LessThan(String, PakValue),
+    GreaterThanEqual(String, PakValue),
+    LessThanEqual(String, PakValue),
 }
 
 impl PakQuery {
@@ -108,6 +110,14 @@ impl PakQuery {
     pub fn less_than(key : &str, value : impl Into<PakValue>) -> Self {
         PakQuery::LessThan(key.to_string(), value.into())
     }
+    
+    pub fn greater_than_equal(key : &str, value : impl Into<PakValue>) -> Self {
+        PakQuery::GreaterThanEqual(key.to_string(), value.into())
+    }
+    
+    pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> Self {
+        PakQuery::LessThanEqual(key.to_string(), value.into())
+    }
 }
 
 pub fn equals(key : &str, value : impl Into<PakValue>) -> PakQuery {
@@ -120,6 +130,14 @@ pub fn greater_than(key : &str, value : impl Into<PakValue>) -> PakQuery {
 
 pub fn less_than(key : &str, value : impl Into<PakValue>) -> PakQuery {
     PakQuery::LessThan(key.to_string(), value.into())
+}
+
+pub fn greater_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
+    PakQuery::GreaterThanEqual(key.to_string(), value.into())
+}
+
+pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
+    PakQuery::LessThanEqual(key.to_string(), value.into())
 }
 
 impl PakQueryExpression for PakQuery {
@@ -136,6 +154,14 @@ impl PakQueryExpression for PakQuery {
             PakQuery::LessThan(key, pak_value) => {
                 let tree = pak.get_tree(key)?;
                 tree.get_less(pak_value)
+            },
+            PakQuery::GreaterThanEqual(key, pak_value) => {
+                let tree = pak.get_tree(key)?;
+                tree.get_greater_eq(pak_value)
+            },
+            PakQuery::LessThanEqual(key, pak_value) => {
+                let tree = pak.get_tree(key)?;
+                tree.get_less_eq(pak_value)
             },
         }
     }
