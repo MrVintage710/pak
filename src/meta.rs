@@ -14,22 +14,3 @@ pub struct PakSizing {
     pub indices_size: u64,
     pub vault_size: u64,
 }
-
-#[cfg(test)]
-mod test {
-    use super::PakSizing;
-
-    
-    #[test]
-    fn size_of_pak_sizes() {
-        let sizing = PakSizing {
-            meta_size: 0,
-            indices_size: 0,
-            vault_size: 0,
-        };
-        
-        let size = bincode::serialized_size(&sizing).unwrap();
-        assert_eq!(size, 24);
-    }
-    
-}

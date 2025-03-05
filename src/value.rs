@@ -8,6 +8,8 @@ use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
+use crate::PakPointer;
+
 #[derive(Deserialize, Serialize, Clone, Hash, Default)]
 pub enum PakValue {
     String(String),
@@ -22,7 +24,7 @@ pub enum PakValue {
 impl PartialEq for PakValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (PakValue::String(a), PakValue::String(b)) => {println!("{a} == {b} == {}", a == b); a == b},
+            (PakValue::String(a), PakValue::String(b)) => a == b,
             (PakValue::Float(a), PakValue::Float(b)) => a == b,
             (PakValue::Float(a), PakValue::Int(b)) => f64::from_bits(*a) == *b as f64,
             (PakValue::Float(a), PakValue::Uint(b)) => f64::from_bits(*a) == *b as f64,
@@ -280,21 +282,5 @@ impl From<u8> for PakValue {
 impl From<bool> for PakValue {
     fn from(value: bool) -> Self {
         PakValue::Boolean(value)
-    }
-}
-
-//==============================================================================================
-//        Tests
-//==============================================================================================
-
-#[cfg(test)]
-mod tests {
-    use crate::value::PakValue;
-
-    
-    #[test]
-    fn pak_value_compare() {
-        assert!(PakValue::float(2.0) == PakValue::float(2.0));
-        assert!(PakValue::uint(40u64) > PakValue::int(50));
     }
 }

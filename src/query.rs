@@ -18,7 +18,6 @@ impl PakQueryExpression for PakQueryUnion {
     fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
-        println!("UNION: {results_a:?} AND {results_b:?}");
         let results = results_a.into_iter().chain(results_b.into_iter()).collect::<HashSet<_>>();
         Ok(results)
     }
@@ -58,7 +57,6 @@ impl PakQueryExpression for PakQueryIntersection {
     fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
-        println!("INTERSECTION: {results_a:?} AND {results_b:?}");
         Ok(results_a.into_iter().filter(|e| results_b.contains(e)).collect())
     }
 }
@@ -140,85 +138,5 @@ impl PakQueryExpression for PakQuery {
                 tree.get_less(pak_value)
             },
         }
-    }
-}
-
-//==============================================================================================
-//        Tests
-//==============================================================================================
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Once;
-    use serde::{Deserialize, Serialize};
-    use crate::{index::PakIndex, item::PakItemSearchable, query::*, Pak, PakBuilder};
-    
-    static INIT: Once = Once::new();
-    
-    pub fn initialize() {
-        INIT.call_once(|| {
-            let mut builder = PakBuilder::new();
-            
-            let person1 = Person {
-                first_name: "John".to_string(),
-                last_name: "Doe".to_string(),
-                age: 30,
-            };
-            
-            let person2 = Person {
-                first_name: "Jane".to_string(),
-                last_name: "Doe".to_string(),
-                age: 25,
-            };
-            
-            let person3 = Person {
-                first_name: "Alice".to_string(),
-                last_name: "Smith".to_string(),
-                age: 28,
-            };
-            
-            let person4 = Person {
-                first_name: "John".to_string(),
-                last_name: "Jacob".to_string(),
-                age: 28,
-            };
-            
-            builder.pak(person1).unwrap();
-            builder.pak(person2).unwrap();
-            builder.pak(person3).unwrap();
-            builder.pak(person4).unwrap();
-            
-            builder.build("test.pak").unwrap();
-        });
-    }
-    
-    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-    struct Person {
-        first_name: String,
-        last_name: String,
-        age: u32,
-    }
-    
-    impl PakItemSearchable for Person {
-        fn get_indices(&self) -> Vec<PakIndex> {
-            let mut indices = Vec::new();
-            indices.push(PakIndex::new("first_name", self.first_name.clone()));
-            indices.push(PakIndex::new("last_name", self.last_name.clone()));
-            indices.push(PakIndex::new("age", self.age));
-            indices
-        }
-    }
-
-    #[test]
-    fn query() {
-        initialize();
-        
-        let pak = Pak::open("test.pak").unwrap();
-        
-        let query = greater_than("age", 26) & equals("first_name", "John");
-        
-        let results = pak.query::<Person>(query).unwrap();
-        println!("RESULTS {results:?}");
-        assert_eq!(results.len(), 2);
     }
 }

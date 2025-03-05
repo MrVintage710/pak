@@ -64,7 +64,6 @@ impl <'p> PakTree<'p> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_less_r(value, *pointer, &mut results, false)?;
-        println!("GET LESS {value:?} -> {results:?}");
         Ok(results)
     }
     
@@ -72,7 +71,6 @@ impl <'p> PakTree<'p> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_less_r(value, *pointer, &mut results, true)?;
-        println!("GET LESS EQ {value:?} -> {results:?}");
         Ok(results)
     }
     
@@ -109,7 +107,6 @@ impl <'p> PakTree<'p> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_greater_r(value, *pointer, &mut results, false)?;
-        println!("GET GREATER {value:?} -> {results:?}");
         Ok(results)
     }
     
@@ -405,31 +402,5 @@ impl PartialOrd for PakTreePageEntry {
 impl Ord for PakTreePageEntry {
     fn cmp(&self, other: &Self) -> Ordering {
         self.key.cmp(&other.key)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::PakPointer;
-
-    use super::PakTreeBuilder;
-
-   
-    #[test]
-    fn insert_into_pak_tree() {
-        let mut tree = PakTreeBuilder::new(2);
-        tree.access().insert(10, PakPointer::default())
-            .insert(20, PakPointer::default())
-            .insert(30, PakPointer::default())
-            .insert(40, PakPointer::default())
-        
-            // should trigger a split
-            .insert(25, PakPointer::default())
-        
-            .insert(5, PakPointer::default())
-            .insert(15, PakPointer::default())
-            .insert(35, PakPointer::default())
-            .insert(45, PakPointer::default())
-            .insert(46, PakPointer::default());
     }
 }

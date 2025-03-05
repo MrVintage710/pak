@@ -1,5 +1,7 @@
 use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
+use crate::value::IntoPakValue;
+
 use super::{value::PakValue, PakPointer};
 
 pub type PakIndices = HashMap<PakValue, Vec<PakPointer>>;
@@ -15,10 +17,10 @@ pub struct PakIndex {
 }
 
 impl PakIndex {
-    pub fn new<I, V>(key : I, value : V) -> Self where I : PakIndexIdentifier, V : Into<PakValue> {
+    pub fn new<I, V>(key : I, value : V) -> Self where I : PakIndexIdentifier, V : IntoPakValue {
         Self {
             key: key.identifier().to_string(),
-            value: value.into(),
+            value: value.into_pak_value(),
         }
     }
 }
@@ -41,11 +43,4 @@ impl <'id> PakIndexIdentifier for &'id str {
     fn identifier(&self) -> &str {
         self
     }
-}
-
-#[cfg(test)]
-mod test {
-    
-    use super::*;
-    
 }

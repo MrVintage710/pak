@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, fs::{self, File}, io::{BufReader, Read, Seek, SeekFrom}, path::Path};
+use std::{cell::RefCell, collections::HashMap, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 
 use btree::{PakTree, PakTreeBuilder};
-use index::{PakIndex, PakIndices};
-use item::{PakItemDef, PakItemRef, PakItemSearchable};
+use index::PakIndex;
+use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
 use meta::{PakMeta, PakSizing};
 use query::PakQueryExpression;
 use serde::{Deserialize, Serialize};
@@ -18,42 +18,74 @@ pub mod btree;
 pub mod query;
 pub mod error;
 
+#[cfg(test)]
+mod test;
+
 //==============================================================================================
 //        Pak File
 //==============================================================================================
 
 pub struct Pak {
     sizing : PakSizing,
-    source : RefCell<BufReader<File>>
+    meta : PakMeta,
+    source : RefCell<Box<dyn PakSource>>
 }
 
-impl Pak {
-    pub fn open(path : impl AsRef<Path>) -> PakResult<Self> {
-        let file = File::open(path)?;
-        let mut stream = BufReader::new(file);
+// impl Pak<BufReader<File>> {
+//     pub fn open(path : impl AsRef<Path>) -> PakResult<Self> {
+//         let file = File::open(path)?;
+//         let mut stream = BufReader::new(file);
         
-        let mut sizing_buffer = [0u8; 24];
-        stream.read_exact(&mut sizing_buffer)?;
-        let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
+//         let mut sizing_buffer = [0u8; 24];
+//         stream.read_exact(&mut sizing_buffer)?;
+//         let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
 
-        let mut meta_buffer = vec![0u8; sizing.meta_size as usize];
-        stream.seek(SeekFrom::Start(24))?;
-        stream.read_exact(&mut meta_buffer)?;
+//         let mut meta_buffer = vec![0u8; sizing.meta_size as usize];
+//         stream.seek(SeekFrom::Start(24))?;
+//         stream.read_exact(&mut meta_buffer)?;
+//         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
+
+//         Ok(Self { sizing, source : RefCell::new(stream), meta })
+//     }
+// }
+
+// impl Pak<Cursor<Vec<u8>>> {
+//     pub fn open_in_memory(data : Vec<u8>) -> PakResult<Self> {
+//         let mut stream = Cursor::new(data);
+        
+//         let mut sizing_buffer = [0u8; 24];
+//         stream.read_exact(&mut sizing_buffer)?;
+//         let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
+
+//         let mut meta_buffer = vec![0u8; sizing.meta_size as usize];
+//         stream.seek(SeekFrom::Start(24))?;
+//         stream.read_exact(&mut meta_buffer)?;
+//         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
+
+//         Ok(Self { sizing, source : RefCell::new(stream), meta })
+//     }
+// }
+
+impl Pak {
+    pub fn new<S>(mut source : S) -> PakResult<Self> where S : PakSource + 'static {
+        let sizing_pointer = PakPointer::new(0, 24);
+        let sizing_buffer = source.read(sizing_pointer, 0)?;
+        let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
+        
+        let meta_pointer = PakPointer::new(24, sizing.meta_size);
+        let meta_buffer = source.read(meta_pointer, 0)?;
         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
 
-        Ok(Self { sizing, source : RefCell::new(stream) })
+        Ok(Self { sizing, source : RefCell::new(Box::new(source)), meta })
     }
     
-    pub(crate) fn read_err<T>(&self, pointer : PakPointer) -> PakResult<T> where T : PakItemRef {
-        let mut stream = self.source.borrow_mut();
-        let mut buffer = vec![0u8; pointer.size as usize];
-        stream.seek(SeekFrom::Start(pointer.offset + self.get_vault_start()))?;
-        stream.read_exact(&mut buffer)?;
+    pub(crate) fn read_err<T>(&self, pointer : PakPointer) -> PakResult<T> where T : PakItemDeserialize {
+        let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
         Ok(res)
     }
     
-    pub(crate) fn read<T>(&self, pointer : PakPointer) -> Option<T> where T : PakItemRef {
+    pub(crate) fn read<T>(&self, pointer : PakPointer) -> Option<T> where T : PakItemDeserialize {
         let res = self.read_err(pointer);
         match res {
             Ok(res) => Some(res),
@@ -66,29 +98,16 @@ impl Pak {
     }
     
     pub fn fetch_indices(&self) -> PakResult<HashMap<String, PakPointer>> {
-        let mut stream = self.source.borrow_mut();
-        let mut buffer = vec![0u8; self.sizing.indices_size as usize];
-        stream.seek(SeekFrom::Start(self.get_indices_start()))?;
-        stream.read_exact(&mut buffer)?;
+        let pointer = PakPointer::new(self.get_indices_start(), self.sizing.indices_size);
+        let buffer = self.source.borrow_mut().read(pointer, 0)?;
         let indices = bincode::deserialize(&buffer)?;
         Ok(indices)
     }
     
-    pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<Vec<T>> where T : PakItemRef  {
+    pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
         let pointers = query.execute(self)?;
-        let values = pointers.into_iter().filter_map(|pointer| self.read::<T>(pointer)).collect::<Vec<_>>();
-        Ok(values)
-    }
-    
-    pub fn search<T>(&self, key : &str, value : impl Into<PakValue>) -> PakResult<Vec<T>> where T : PakItemRef {
-        let value = value.into();
-        let index_types = self.fetch_indices()?;
-        let Some(pointer) = index_types.get(key) else {return Ok(vec![])};
-        let indices : PakIndices = self.read_err(*pointer)?;
-        let Some(object_pointers) = indices.get(&value) else {return Ok(vec![])};
-        let res = object_pointers.iter().filter_map(|pointer| self.read::<T>(*pointer)).collect::<Vec<_>>();
-        
-        Ok(res)
+        // let values = pointers.into_iter().filter_map(|pointer| self.read::<T>(pointer)).collect::<Vec<_>>();
+        T::deserialize_group(self, pointers)
     }
     
     pub fn get_vault_start(&self) -> u64 {
@@ -122,7 +141,24 @@ impl PakPointer {
 }
 
 //==============================================================================================
-//        PakVault
+//        PakSource
+//==============================================================================================
+
+pub trait PakSource {
+    fn read(&mut self, pointer : PakPointer, offest : u64) -> PakResult<Vec<u8>>;
+}
+
+impl <R> PakSource for R where R : Read + Seek {
+    fn read(&mut self, pointer : PakPointer, offest : u64) -> PakResult<Vec<u8>> {
+        let mut buffer = vec![0u8; pointer.size as usize];
+        self.seek(SeekFrom::Start(pointer.offset + offest))?;
+        self.read_exact(&mut buffer)?;
+        Ok(buffer)
+    }
+}
+
+//==============================================================================================
+//        PakBuilder
 //==============================================================================================
 
 pub struct PakBuilder {
@@ -146,7 +182,7 @@ impl PakBuilder {
         }
     }
     
-    pub fn pak_no_search<T: PakItemDef>(&mut self, item : T) -> PakResult<PakPointer> {
+    pub fn pak_no_search<T: PakItemSerialize>(&mut self, item : T) -> PakResult<PakPointer> {
         let bytes = item.into_bytes()?;
         let pointer = PakPointer::new(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
@@ -155,7 +191,7 @@ impl PakBuilder {
         Ok(pointer)
     }
     
-    pub fn pak<T : PakItemDef + PakItemSearchable>(&mut self, item : T) -> PakResult<PakVaultReference> {
+    pub fn pak<T : PakItemSerialize + PakItemSearchable>(&mut self, item : T) -> PakResult<PakVaultReference> {
         let indices = item.get_indices();
         let bytes = item.into_bytes()?;
         let pointer = PakPointer::new(self.size_in_bytes, bytes.len() as u64);
@@ -163,11 +199,6 @@ impl PakBuilder {
         self.vault.extend(bytes);
         self.chunks.push(PakVaultReference { pointer, indices: indices.clone() });
         Ok(PakVaultReference { pointer, indices })
-    }
-    
-    pub fn unpak<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemRef {
-        let res = T::from_pak(&self.vault, *pointer)?;
-        Ok(res)
     }
     
     pub fn size(&self) -> u64 {
@@ -205,7 +236,7 @@ impl PakBuilder {
         self.author = author.to_string();
     }
     
-    pub fn build_in_memory(mut self)  -> PakResult<(Vec<u8>, PakSizing, PakMeta)> {
+    fn build_internal(mut self)  -> PakResult<(Vec<u8>, PakSizing, PakMeta)> {
         let mut map : HashMap<String, PakTreeBuilder> = HashMap::new();
         for chunk in &self.chunks {
             for index in &chunk.indices{
@@ -249,14 +280,25 @@ impl PakBuilder {
         Ok((out, sizing, meta))
     }
     
-    pub fn build(self, path : impl AsRef<Path>) -> PakResult<Pak> {
-        
-        let (out, sizing, meta) = self.build_in_memory()?;
+    pub fn build_file(self, path : impl AsRef<Path>) -> PakResult<Pak> {
+        let (out, sizing, meta) = self.build_internal()?;
         
         fs::write(&path, out)?;
+        let pak  = Pak {
+            sizing,
+            meta,
+            source: RefCell::new(Box::new(BufReader::new(File::open(path)?))),
+        };
+        Ok(pak)
+    }
+    
+    pub fn build_in_memory(self) -> PakResult<Pak> {
+        let (out, sizing, meta) = self.build_internal()?;
+        
         let pak = Pak {
             sizing,
-            source: RefCell::new(BufReader::new(File::open(path)?)),
+            meta,
+            source: RefCell::new(Box::new(Cursor::new(out))),
         };
         Ok(pak)
     }
@@ -270,83 +312,4 @@ impl PakBuilder {
 pub struct PakVaultReference {
     pub pointer : PakPointer,
     pub indices : Vec<PakIndex>
-}
-
-//==============================================================================================
-//        Tests
-//==============================================================================================
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Once;
-
-    use super::*;
-    
-    static INIT: Once = Once::new();
-    
-    pub fn initialize() {
-        INIT.call_once(|| {
-            let mut builder = PakBuilder::new();
-            
-            let person1 = Person {
-                first_name: "John".to_string(),
-                last_name: "Doe".to_string(),
-            };
-            
-            let person2 = Person {
-                first_name: "Jane".to_string(),
-                last_name: "Doe".to_string(),
-            };
-            
-            let person3 = Person {
-                first_name: "Alice".to_string(),
-                last_name: "Smith".to_string(),
-            };
-            
-            builder.pak(person1).unwrap();
-            builder.pak(person2).unwrap();
-            builder.pak(person3).unwrap();
-            
-            builder.build("test.pak").unwrap();
-        });
-    }
-    
-    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-    struct Person {
-        first_name: String,
-        last_name: String,
-    }
-    
-    impl PakItemSearchable for Person {
-        fn get_indices(&self) -> Vec<PakIndex> {
-            let mut indices = Vec::new();
-            indices.push(PakIndex::new("first_name", self.first_name.clone()));
-            indices.push(PakIndex::new("last_name", self.last_name.clone()));
-            Vec::new()
-        }
-    }
-    
-    #[test]
-    fn test_pak_fetch_indices() { 
-        initialize();   
-        let pak = Pak::open("test.pak").unwrap();
-        let indices = pak.fetch_indices().unwrap();
-        assert_eq!(indices.len(), 2);
-    }
-    
-    #[test]
-    fn test_pak_read() { 
-        initialize();
-        let pak = Pak::open("test.pak").unwrap();
-        let person : Person = pak.read(PakPointer::new(0, 23)).unwrap();
-        assert_eq!(person.first_name, "John".to_string());
-    }
-    
-    #[test]
-    fn test_pak_search() {
-        initialize(); 
-        let pak = Pak::open("test.pak").unwrap();
-        let res : Vec<Person> = pak.search("last_name", "Doe").unwrap();
-        assert_eq!(res.len(), 2);
-    }
 }
