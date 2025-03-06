@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::{index::PakIndex, item::PakItemSearchable, pointer::PakPointer, query::PakQuery, value::IntoPakValue, Pak, PakBuilder};
+use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, value::IntoPakValue, Pak, PakBuilder};
 
 //==============================================================================================
 //        Person
@@ -59,6 +59,7 @@ impl PakItemSearchable for Pet {
     }
 }
 
+/// This is the unofficial build test, this runs in every test
 pub fn build_data_base() -> Pak {
     let mut builder = PakBuilder::new();
     
@@ -147,7 +148,7 @@ fn pak_read() {
 fn pak_query_equal() {
     let pak = build_data_base();
     
-    let people = pak.query::<(Person, )>(PakQuery::equals("first_name", "John")).unwrap();
+    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
     assert_eq!(people.len(), 2);
 }
 
@@ -155,9 +156,9 @@ fn pak_query_equal() {
 fn pak_query_less_than() {
     let pak = build_data_base();
     
-    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::less_than("age", 26)).unwrap();
+    let (people, pets) = pak.query::<(Person, Pet)>("age".less_than_or_equal(26)).unwrap();
     
-    assert_eq!(people.len(), 3);
+    assert_eq!(people.len(), 1);
     assert_eq!(pets.len(), 3);
 }
 
@@ -165,7 +166,7 @@ fn pak_query_less_than() {
 fn pak_query_greater_than() {
     let pak = build_data_base();
     
-    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::greater_than("age", 26)).unwrap();
+    let (people, pets) = pak.query::<(Person, Pet)>("age".greater_than(26)).unwrap();
     
     assert_eq!(people.len(), 5);
     assert_eq!(pets.len(), 0);
@@ -175,7 +176,7 @@ fn pak_query_greater_than() {
 fn pak_query_greater_than_equal() {
     let pak = build_data_base();
     
-    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::greater_than_equal("age", 25)).unwrap();
+    let (people, pets) = pak.query::<(Person, Pet)>("age".greater_than_or_equal(25)).unwrap();
     
     assert_eq!(people.len(), 6);
     assert_eq!(pets.len(), 0);
@@ -185,9 +186,9 @@ fn pak_query_greater_than_equal() {
 fn pak_query_less_than_equal() {
     let pak = build_data_base();
     
-    let (people, pets) = pak.query::<(Person, Pet)>(PakQuery::less_than_equal("age", 25)).unwrap();
+    let (people, pets) = pak.query::<(Person, Pet)>("age".less_than_or_equal(25)).unwrap();
     
-    assert_eq!(people.len(), 3);
+    assert_eq!(people.len(), 1);
     assert_eq!(pets.len(), 3);
 }
 
@@ -195,11 +196,20 @@ fn pak_query_less_than_equal() {
 fn compound_union_query() {
     let pak = build_data_base();
     
-    let query = PakQuery::less_than("age", 30) | PakQuery::equals("first_name", "John");
+    let query = "age".less_than(30) | "first_name".equals("John");
     let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
-    
-    println!("{people:?} \n \n {pets:?}");
     
     assert_eq!(people.len(), 4);
     assert_eq!(pets.len(), 3);
+}
+
+#[test]
+fn compound_intersection_query() {
+    let pak = build_data_base();
+    
+    let query = "age".greater_than(25) & "first_name".equals("John");
+    let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
+    
+    assert_eq!(people.len(), 2);
+    assert_eq!(pets.len(), 0);
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::{pointer::PakUntypedPointer, value::IntoPakValue};
+use crate::{pointer::PakUntypedPointer, query::PakQuery, value::IntoPakValue};
 
 use super::value::PakValue;
 
@@ -31,6 +31,26 @@ impl PakIndex {
 
 pub trait PakIndexIdentifier {
     fn identifier(&self) -> &str;
+    
+    fn equals<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
+        PakQuery::equals(self.identifier(), other.into_pak_value())
+    }
+    
+    fn less_than<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
+        PakQuery::less_than(self.identifier(), other.into_pak_value())
+    }
+    
+    fn greater_than<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
+        PakQuery::greater_than(self.identifier(), other.into_pak_value())
+    }
+    
+    fn greater_than_or_equal<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
+        PakQuery::greater_than_equal(self.identifier(), other.into_pak_value())
+    }
+    
+    fn less_than_or_equal<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
+        PakQuery::less_than_equal(self.identifier(), other.into_pak_value())
+    }
 }
 
 impl PakIndexIdentifier for String {
