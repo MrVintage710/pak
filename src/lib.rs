@@ -1,14 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, marker::PhantomData, path::Path};
-
-use bincode::Options;
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
 use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
 use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakTypedPointer, PakUntypedPointer};
 use query::PakQueryExpression;
-use serde::{Deserialize, Serialize};
-use value::PakValue;
 
 use crate::error::PakResult;
 
@@ -90,6 +86,22 @@ impl Pak {
     
     pub fn size(&self) -> u64 {
         24 + self.sizing.meta_size + self.sizing.indices_size + self.sizing.vault_size
+    }
+    
+    pub fn name(&self) -> &str {
+        &self.meta.name
+    }
+    
+    pub fn version(&self) -> &str {
+        &self.meta.version
+    }
+    
+    pub fn author(&self) -> &str {
+        &self.meta.author
+    }
+    
+    pub fn description(&self) -> &str {
+        &self.meta.description
     }
 }
 

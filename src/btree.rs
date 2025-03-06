@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::{HashMap, HashSet, VecDeque}, fmt::Debug, path::Display, rc::Rc};
+use std::{cmp::Ordering, collections::{HashMap, HashSet, VecDeque}, fmt::Debug};
 use serde::{Deserialize, Serialize};
 
 use crate::{error::PakResult, pointer::{PakPointer, PakTypedPointer, PakUntypedPointer}};
@@ -339,14 +339,6 @@ impl PakTreePage {
                 self.values.push_back(e);
                 return PakTreeStatus::Ok(self.values.len() - 1);
             },
-        }
-    }
-    
-    fn new_child(&mut self, index : usize, pointer : usize) {
-        if index < self.values.len() {
-            self.values[index].previous = Some(pointer);
-        } else {
-            self.next = Some(pointer);
         }
     }
 }

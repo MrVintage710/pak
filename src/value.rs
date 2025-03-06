@@ -1,14 +1,9 @@
-
-
 //==============================================================================================
 //        Pak Values
 //==============================================================================================
 
 use std::fmt::Debug;
-
 use serde::{Deserialize, Serialize};
-
-use crate::PakUntypedPointer;
 
 #[derive(Deserialize, Serialize, Clone, Hash, Default)]
 pub enum PakValue {
