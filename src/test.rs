@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::{index::PakIndex, item::PakItemSearchable, query::PakQuery, value::IntoPakValue, Pak, PakBuilder, PakPointer};
+use crate::{index::PakIndex, item::PakItemSearchable, pointer::{PakPointer, PakUntypedPointer}, query::PakQuery, value::IntoPakValue, Pak, PakBuilder};
 
 //==============================================================================================
 //        Person
@@ -109,21 +109,21 @@ pub fn build_data_base() -> Pak {
     let pet1 = Pet {
         name: "Fido".to_string(),
         age: 5,
-        owner: owner1.pointer,
+        owner: owner1.clone(),
         kind: PetKind::Dog,
     };
     
     let pet2 = Pet {
         name: "Whiskers".to_string(),
         age: 3,
-        owner: owner2.pointer,
+        owner: owner2,
         kind: PetKind::Cat,
     };
     
     let pet3 = Pet {
         name: "Bella".to_string(),
         age: 7,
-        owner: owner1.pointer,
+        owner: owner1,
         kind: PetKind::Dog,
     };
     
@@ -137,7 +137,7 @@ pub fn build_data_base() -> Pak {
 #[test]
 fn pak_read() {
     let pak = build_data_base();
-    let person : Person = pak.read_err(PakPointer::new(0, 27)).unwrap();
+    let person : Person = pak.read_err(&PakPointer::new_untyped(0, 27)).unwrap();
     
     assert_eq!(person.first_name, "John");
     assert_eq!(person.last_name, "Doe");
@@ -198,7 +198,7 @@ fn compound_union_query() {
     let query = PakQuery::less_than("age", 30) | PakQuery::equals("first_name", "John");
     let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
     
-    println!("{people:?}");
+    println!("{people:?} \n \n {pets:?}");
     
     assert_eq!(people.len(), 4);
     assert_eq!(pets.len(), 3);

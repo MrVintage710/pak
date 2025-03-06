@@ -1,10 +1,10 @@
 use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
-use crate::value::IntoPakValue;
+use crate::{pointer::PakUntypedPointer, value::IntoPakValue};
 
-use super::{value::PakValue, PakPointer};
+use super::value::PakValue;
 
-pub type PakIndices = HashMap<PakValue, Vec<PakPointer>>;
+pub type PakIndices = HashMap<PakValue, Vec<PakUntypedPointer>>;
 
 //==============================================================================================
 //        PakIndex

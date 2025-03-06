@@ -1,9 +1,9 @@
 use std::{cmp::Ordering, collections::{HashMap, HashSet, VecDeque}, fmt::Debug, path::Display, rc::Rc};
 use serde::{Deserialize, Serialize};
 
-use crate::error::PakResult;
+use crate::{error::PakResult, pointer::{PakPointer, PakTypedPointer, PakUntypedPointer}};
 
-use super::{value::PakValue, Pak, PakBuilder, PakPointer};
+use super::{value::PakValue, Pak, PakBuilder};
 
 
 //==============================================================================================
@@ -19,7 +19,7 @@ impl <'p> PakTree<'p> {
     pub fn new(pak: &'p Pak, key : &str) -> PakResult<PakTree<'p>> {
         let indices = pak.fetch_indices()?;
         let pointer = indices.get(key).unwrap();
-        let meta : PakTreeMeta = pak.read_err(*pointer)?;
+        let meta : PakTreeMeta = pak.read_err(&pointer.as_pointer())?;
         
         Ok(PakTree {
             pak,
@@ -27,15 +27,15 @@ impl <'p> PakTree<'p> {
         })
     }
     
-    pub fn get(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+    pub fn get(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut set = HashSet::new();
         self.get_r(value, *pointer, &mut set)?;
         Ok(set)
     }
     
-    fn get_r(&self, value : &PakValue, current_page : PakPointer, set : &mut HashSet<PakPointer>) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err(current_page)?;
+    fn get_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut HashSet<PakTypedPointer>) -> PakResult<()> {
+        let page : PakTreePage = self.pak.read_err(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key < value {
@@ -60,22 +60,22 @@ impl <'p> PakTree<'p> {
         Ok(())
     }
     
-    pub fn get_less(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+    pub fn get_less(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_less_r(value, *pointer, &mut results, false)?;
         Ok(results)
     }
     
-    pub fn get_less_eq(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+    pub fn get_less_eq(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_less_r(value, *pointer, &mut results, true)?;
         Ok(results)
     }
     
-    fn get_less_r(&self, value : &PakValue, current_page : PakPointer, set : &mut HashSet<PakPointer>, match_eq : bool) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err(current_page)?;
+    fn get_less_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut HashSet<PakTypedPointer>, match_eq : bool) -> PakResult<()> {
+        let page : PakTreePage = self.pak.read_err(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key > value {
@@ -103,22 +103,22 @@ impl <'p> PakTree<'p> {
         Ok(())
     }
     
-    pub fn get_greater(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+    pub fn get_greater(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_greater_r(value, *pointer, &mut results, false)?;
         Ok(results)
     }
     
-    pub fn get_greater_eq(&self, value : &PakValue) -> PakResult<HashSet<PakPointer>> {
+    pub fn get_greater_eq(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
         let pointer = self.meta.pages.get(&0).unwrap();
         let mut results = HashSet::new();
         self.get_greater_r(value, *pointer, &mut results, true)?;
         Ok(results)
     }
     
-    fn get_greater_r(&self, value : &PakValue, current_page : PakPointer, set : &mut HashSet<PakPointer>, match_eq : bool) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err(current_page)?;
+    fn get_greater_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut HashSet<PakTypedPointer>, match_eq : bool) -> PakResult<()> {
+        let page : PakTreePage = self.pak.read_err(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key < value {
@@ -153,7 +153,7 @@ impl <'p> PakTree<'p> {
 
 #[derive(Deserialize, Serialize)]
 pub struct PakTreeMeta {
-    pages: HashMap<usize, PakPointer>,
+    pages: HashMap<usize, PakUntypedPointer>,
 }
 
 //==============================================================================================
@@ -186,10 +186,10 @@ impl PakTreeBuilder {
     
     pub fn into_pak(self, pak : &mut PakBuilder) -> PakResult<PakPointer> {
         
-        let mut page_map = HashMap::<usize, PakPointer>::new();
+        let mut page_map = HashMap::<usize, PakUntypedPointer>::new();
         for (index, page) in self.pages.into_iter().enumerate() {
             let pointer = pak.pak_no_search(page)?;
-            page_map.insert(index as usize, pointer);
+            page_map.insert(index as usize, pointer.as_untyped());
         }
         
         pak.pak_no_search(PakTreeMeta{ pages : page_map})
@@ -257,7 +257,7 @@ impl PakTreeBuilderAccess<'_> {
         index
     }
     
-    pub fn insert<K>(&mut self, key: K, value: PakPointer) -> &mut Self where K: Into<PakValue> {
+    pub fn insert<K>(&mut self, key: K, value: PakTypedPointer) -> &mut Self where K: Into<PakValue> {
         self.insert_entry(PakTreePageEntry::new(key.into(), value));
         self
     }
@@ -363,7 +363,7 @@ enum PakTreeStatus {
 #[derive(Serialize, Deserialize)]
 pub struct PakTreePageEntry {
     key: PakValue,
-    values: Vec<PakPointer>,
+    values: Vec<PakTypedPointer>,
     previous: Option<usize>,
 }
 
@@ -379,7 +379,7 @@ impl Debug for PakTreePageEntry {
 }
 
 impl PakTreePageEntry {
-    pub fn new(key: PakValue, value: PakPointer) -> Self {
+    pub fn new(key: PakValue, value: PakTypedPointer) -> Self {
         PakTreePageEntry {
             key,
             values : vec![value],

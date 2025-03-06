@@ -1,21 +1,20 @@
 use std::{collections::HashSet, ops::{BitAnd, BitOr}};
 
-use crate::error::PakResult;
-
-use super::{value::PakValue, Pak, PakPointer};
+use crate::{error::PakResult, pointer::PakTypedPointer};
+use super::{value::PakValue, Pak};
 
 //==============================================================================================
 //        Pak Query
 //==============================================================================================
 
 pub trait PakQueryExpression {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>>;
+    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>>;
 }
 
 pub struct PakQueryUnion(Box<dyn PakQueryExpression>, Box<dyn PakQueryExpression>);
 
 impl PakQueryExpression for PakQueryUnion {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
         println!("UNION {results_a:?} & {results_b:?}");
@@ -55,7 +54,7 @@ impl <B> BitOr<B> for PakQuery where B : PakQueryExpression + 'static {
 pub struct PakQueryIntersection(Box::<dyn PakQueryExpression>, Box::<dyn PakQueryExpression>);
 
 impl PakQueryExpression for PakQueryIntersection {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
         Ok(results_a.into_iter().filter(|e| results_b.contains(e)).collect())
@@ -142,7 +141,7 @@ pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
 }
 
 impl PakQueryExpression for PakQuery {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
         match self {
             PakQuery::Equal(key, pak_value) => {
                 let tree = pak.get_tree(key)?;

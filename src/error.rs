@@ -4,6 +4,9 @@ pub type PakResult<T> = Result<T, PakError>;
 
 #[derive(Error, Debug)]
 pub enum PakError {
+    #[error("Type mismatch error: {0} found, {1} expected")]
+    TypeMismatchError(String, String),
+    
     #[error("Was unable to update rules item: {0}")]
     UpdateRuleItemError(String),
     #[error("Was unable to insert rules item: {0}")]
