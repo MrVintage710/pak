@@ -1,5 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 
+use bincode::Options;
 use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
 use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
@@ -82,6 +83,7 @@ impl Pak {
     pub(crate) fn read_err<T>(&self, pointer : PakPointer) -> PakResult<T> where T : PakItemDeserialize {
         let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
+        println!("Reading {} from {pointer:?}:   Buffer: {buffer:?}", std::any::type_name::<T>());
         Ok(res)
     }
     

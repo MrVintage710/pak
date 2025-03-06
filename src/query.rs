@@ -18,6 +18,7 @@ impl PakQueryExpression for PakQueryUnion {
     fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
+        println!("UNION {results_a:?} & {results_b:?}");
         let results = results_a.into_iter().chain(results_b.into_iter()).collect::<HashSet<_>>();
         Ok(results)
     }
