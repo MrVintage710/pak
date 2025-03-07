@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![doc(html_logo_url = "https://github.com/MrVintage710/pak/blob/master/docs/icon.png?raw=true")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png")]
 
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 use btree::{PakTree, PakTreeBuilder};
