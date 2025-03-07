@@ -1,7 +1,7 @@
->> ![alt text](https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png)
+![alt text](https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png)
 
->> [![Crates.io Version](https://img.shields.io/crates/v/pak-db)](https://crates.io/crates/pak-db)
->> [![docs.rs](https://img.shields.io/docsrs/pak-db)](https://docs.rs/pak-db/latest/pak_db/)
+[![Crates.io Version](https://img.shields.io/crates/v/pak-db)](https://crates.io/crates/pak-db)
+[![docs.rs](https://img.shields.io/docsrs/pak-db)](https://docs.rs/pak-db/latest/pak_db/)
 
 **This crate is still in very early development and is not ready for production use.**
 
