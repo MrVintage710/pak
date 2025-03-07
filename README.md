@@ -1,4 +1,4 @@
-![alt text](docs/icon.png)
+![alt text](https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png)
 
 **This crate is still in very early development and is not ready for production use.**
 
