@@ -27,6 +27,8 @@ jobs:
         run: cargo clean --doc
       - name: Build docs
         run: cargo doc --no-deps
+      - name: Add redirect
+        run: echo '<meta http-equiv="refresh" content="0;url=pak/pak/index.html">' > target/doc/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
