@@ -6,7 +6,7 @@ Pak is a simple read-only database file that is meant for persistence of rust ty
 
 # Why Pak?
 
-Pak was made for a very specific use case. It needed to store a lot of data, be fast, and easy to use in an enviornment where the data is immutable.
+Pak was made for a very specific use case. Its designed to store a lot of data, be fast to read data, and easy to use in an enviornment where the you don't need to mutate the data often.
 
 You should use Pak if you:
 - Want to easily persist rust types and share them between programs and/or runs.
