@@ -1,5 +1,7 @@
 ![alt text](https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png)
 
+![Crates.io Version](https://img.shields.io/crates/v/pak-db)
+
 **This crate is still in very early development and is not ready for production use.**
 
 Pak is a simple read-only database file that is meant for persistence of rust types and distribution. It is designed to be fast and easy to use.
