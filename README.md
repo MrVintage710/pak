@@ -1,3 +1,5 @@
+![alt text](docs/icon.png)
+
 **This crate is still in very early development and is not ready for production use.**
 
 Pak is a simple read-only database file that is meant for persistence of rust types and distribution. It is designed to be fast and easy to use.
