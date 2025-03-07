@@ -378,10 +378,6 @@ impl PakTreePageEntry {
             previous: None,
         }
     }
-    
-    pub fn compare(&self, key: &PakValue) -> Ordering {
-        self.key.cmp(key)
-    }
 }
 
 impl PartialEq for PakTreePageEntry {

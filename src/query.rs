@@ -1,5 +1,6 @@
-use std::{collections::HashSet, ops::{BitAnd, BitOr}};
+#![doc = include_str!("../docs/queries.md")]
 
+use std::{collections::HashSet, ops::{BitAnd, BitOr}};
 use crate::{error::PakResult, pointer::PakTypedPointer};
 use super::{value::PakValue, Pak};
 
@@ -17,7 +18,6 @@ impl PakQueryExpression for PakQueryUnion {
     fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
-        println!("UNION {results_a:?} & {results_b:?}");
         let results = results_a.into_iter().chain(results_b.into_iter()).collect::<HashSet<_>>();
         Ok(results)
     }
@@ -111,11 +111,11 @@ impl PakQuery {
         PakQuery::LessThan(key.to_string(), value.into())
     }
     
-    pub fn greater_than_equal(key : &str, value : impl Into<PakValue>) -> Self {
+    pub fn greater_than_or_equal(key : &str, value : impl Into<PakValue>) -> Self {
         PakQuery::GreaterThanEqual(key.to_string(), value.into())
     }
     
-    pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> Self {
+    pub fn less_than_or_equal(key : &str, value : impl Into<PakValue>) -> Self {
         PakQuery::LessThanEqual(key.to_string(), value.into())
     }
 }

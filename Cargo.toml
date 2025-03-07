@@ -2,6 +2,13 @@
 name = "pak"
 version = "0.1.0"
 edition = "2024"
+readme = "README.md"
+keywords = ["database", "serialization"]
+description = "A read-only database format designed for speed, ease of use and data sharing."
+license = "MIT OR Apache-2.0"
+
+[lib]
+doctest = false
 
 [dependencies]
 bincode = "1.3.3"

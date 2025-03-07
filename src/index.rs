@@ -45,11 +45,11 @@ pub trait PakIndexIdentifier {
     }
     
     fn greater_than_or_equal<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
-        PakQuery::greater_than_equal(self.identifier(), other.into_pak_value())
+        PakQuery::greater_than_or_equal(self.identifier(), other.into_pak_value())
     }
     
     fn less_than_or_equal<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
-        PakQuery::less_than_equal(self.identifier(), other.into_pak_value())
+        PakQuery::less_than_or_equal(self.identifier(), other.into_pak_value())
     }
 }
 

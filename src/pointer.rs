@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 //==============================================================================================
 //        PakPointer
 //==============================================================================================
+
+/// A pointer that points to a specific location in the pak file. It comes in two flavors, typed and untyped. This pointer is typically offset by the size of the header.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PakPointer {
     Typed(PakTypedPointer),
@@ -74,6 +76,7 @@ impl Clone for PakPointer {
 //        PakTypedPointer
 //==============================================================================================
 
+/// A typed pointer. This tells you what rust type is stored at the location pointed to. You can check it with a type at runtime to fail requests that have a type mismatch.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, Hash)]
 pub struct PakTypedPointer {
     offset : u64,
@@ -95,6 +98,7 @@ impl PakTypedPointer {
 //        PakUntypedPointer
 //==============================================================================================
 
+/// An untyped pointer. This tells you the offset and size of the data at the location pointed to. This is useful if you always know the type of the data at the location pointed to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize, Hash)]
 pub struct PakUntypedPointer {
     offset : u64,
