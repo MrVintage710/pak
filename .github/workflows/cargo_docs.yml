@@ -28,7 +28,7 @@ jobs:
       - name: Build docs
         run: cargo doc --no-deps
       - name: Add redirect
-        run: echo '<meta http-equiv="refresh" content="0;url=pak/pak_db/index.html">' > target/doc/index.html
+        run: echo '<meta http-equiv="refresh" content="0;url=https://mrvintage710.github.io/pak/pak_db/index.html">' > target/doc/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
