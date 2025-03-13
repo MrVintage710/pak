@@ -148,7 +148,7 @@ fn pak_read() {
 fn pak_query_equal() {
     let pak = build_data_base();
     
-    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+    let people = pak.query::<Person>("first_name".equals("John")).unwrap();
     assert_eq!(people.len(), 2);
 }
 
@@ -157,6 +157,8 @@ fn pak_query_less_than() {
     let pak = build_data_base();
     
     let (people, pets) = pak.query::<(Person, Pet)>("age".less_than_or_equal(26)).unwrap();
+    
+    println!("{people:?}");
     
     assert_eq!(people.len(), 1);
     assert_eq!(pets.len(), 3);

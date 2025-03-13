@@ -1,3 +1,6 @@
+use std::fmt::Debug;
+
+use pak_db_derive::PakItem;
 use serde::{Deserialize, Serialize};
 
 //==============================================================================================
@@ -112,5 +115,25 @@ impl PakUntypedPointer {
     
     pub fn as_pointer(&self) -> PakPointer {
         PakPointer::Untyped(*self)
+    }
+}
+
+#[derive(PakItem)]
+pub struct Test {
+    a : u32,
+    b : u32,
+}
+
+impl Test {
+    pub fn new(a : u32, b : u32) -> Self {
+        Self { a, b }
+    }
+    
+    pub fn get_a(&self) -> u32 {
+        self.a
+    }
+    
+    pub fn get_b(&self) -> u32 {
+        self.b
     }
 }

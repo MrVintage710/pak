@@ -4,7 +4,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
-use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
+use item::{FromBytes, IntoBytes, PakItem, PakItemGroup, PakItemSearchable};
 use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakTypedPointer, PakUntypedPointer};
 use query::PakQueryExpression;
@@ -55,9 +55,9 @@ impl Pak {
     }
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
-    pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
+    pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<T::ReturnType> where T : PakItemGroup  {
         let pointers = query.execute(self)?.into_iter().map(|i| i.into_pointer()).collect();
-        T::deserialize_group(self, pointers)
+        T::collect(self, pointers)
     }
     
     /// Returns the size of the pak file in bytes.
@@ -85,19 +85,28 @@ impl Pak {
         &self.meta.description
     }
     
-    pub(crate) fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemDeserialize {
+    pub fn unpak_err<T : PakItem>(&self, pointer : &PakPointer) -> PakResult<T> {
+        if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
+        T::unpak(self, pointer)
+    }
+    
+    pub fn unpak<T : PakItem>(&self, pointer : &PakPointer) -> Option<T> {
+        let res = self.unpak_err(pointer);
+        match res {
+            Ok(res) => Some(res),
+            Err(_) => None,
+        }
+    }
+    
+    pub(crate) fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : FromBytes {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
         Ok(res)
     }
     
-    pub(crate) fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : PakItemDeserialize {
-        let res = self.read_err(pointer);
-        match res {
-            Ok(res) => Some(res),
-            Err(_) => None,
-        }
+    pub(crate) fn read_bytes(&self, pointer : &PakPointer) -> PakResult<Vec<u8>> {
+        self.source.borrow_mut().read(pointer, self.get_vault_start())
     }
     
     pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree> {
@@ -169,7 +178,7 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that does not support searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize).
-    pub fn pak_no_search<T: PakItemSerialize>(&mut self, item : T) -> PakResult<PakPointer> {
+    pub fn pak_no_search<T: IntoBytes>(&mut self, item : T) -> PakResult<PakPointer> {
         let bytes = item.into_bytes()?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
@@ -179,7 +188,7 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that supports searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize) and [PakItemSearchable](crate::PakItemSearchable).
-    pub fn pak<T : PakItemSerialize + PakItemSearchable>(&mut self, item : T) -> PakResult<PakPointer> {
+    pub fn pak<T : IntoBytes + PakItemSearchable>(&mut self, item : T) -> PakResult<PakPointer> {
         let indices = item.get_indices();
         let bytes = item.into_bytes()?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
@@ -187,6 +196,14 @@ impl PakBuilder {
         self.vault.extend(bytes);
         self.chunks.push(PakVaultReference { pointer: pointer.clone().into_typed::<T>(), indices: indices.clone() });
         Ok(pointer)
+    }
+    
+    pub fn store<T>(&mut self, bytes : Vec<u8>, indices : Vec<PakIndex>) -> PakResult<()> where T : PakItem {
+        let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
+        self.size_in_bytes += bytes.len() as u64;
+        self.vault.extend(bytes);
+        self.chunks.push(PakVaultReference { pointer: pointer.into_typed::<T>(), indices });
+        Ok(())
     }
     
     /// The current size of the pak file in bytes.
