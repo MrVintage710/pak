@@ -1,9 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
+use syn::{DataStruct, FieldsNamed};
 use syn::{parse_macro_input, spanned::Spanned, token::Comma, Data, DeriveInput, Fields, Ident, Variant};
+use trait_impl::impl_pak_item;
 
-#[proc_macro_derive(PakItem)]
+mod trait_impl;
+
+#[proc_macro_derive(PakItem, attributes(index))]
 pub fn pak_item_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // Parse the input tokens into a syntax tree
     let input_meta = parse_macro_input!(input as DeriveInput);
@@ -13,9 +17,11 @@ pub fn pak_item_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     
     let enum_def = impl_iden_enum(&name, &input_meta.data);
     
+    let trait_impl = impl_pak_item(&name, &input_meta.data);
+    
     // Build the output, possibly using quasi-quotation
     let expanded = quote! {
-        #enum_def        
+        #trait_impl      
     };
 
     // Hand the output tokens back to the compiler

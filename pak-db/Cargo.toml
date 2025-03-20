@@ -20,3 +20,4 @@ impl-trait-for-tuples = "0.2.3"
 [features]
 default = ["serde"]
 serde = []
+derive = []
