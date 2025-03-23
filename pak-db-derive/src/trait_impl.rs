@@ -9,7 +9,7 @@ use syn::{spanned::Spanned, Data, DataStruct, Fields, FieldsNamed, Ident, Type};
 struct FieldInfo {
     name: Ident,
     span : Span,
-    index : bool,
+    index : bool
 }
 
 //==============================================================================================
@@ -24,17 +24,23 @@ pub fn impl_pak_item(name : &Ident, data : &Data) -> TokenStream {
         _ => unimplemented!()
     };
     
+    let fields_as_prelude_calls = fields.iter().map(|f| {
+        let field_name = &f.name;
+        let field_span = f.span;
+        quote_spanned! { field_span => ::pak_db::prelude::PakItem::prelude(&mut self.#field_name, builder)?}
+    }).collect::<Vec<_>>();
+    
     let fields_as_byte_list = fields.iter().map(|f| {
         let field_name = &f.name;
         let field_span = f.span;
-        quote_spanned! { field_span => ::pak_db::prelude::IntoBytes::into_bytes(&mut self.#field_name, builder)?}
+        quote_spanned! { field_span => ::pak_db::prelude::serialize(&self.#field_name)?}
     }).collect::<Vec<_>>();
     
     let mut index : usize = 0;
     let field_from_bytes_list = fields.iter().map(|f| {
         let field_name = &f.name;
         let field_span = f.span;
-        let stream = quote_spanned! { field_span => #field_name: ::pak_db::prelude::FromBytes::from_bytes(&bytes[#index])?};
+        let stream = quote_spanned! { field_span => #field_name: ::pak_db::prelude::deserialize(&bytes[#index])?};
         index += 1;
         stream
     }).collect::<Vec<_>>();
@@ -47,20 +53,33 @@ pub fn impl_pak_item(name : &Ident, data : &Data) -> TokenStream {
         quote_spanned! {field_span => ::pak_db::index::PakIndex::new(#field_name_str, self.#field_name.clone())}
     });
     
+    // fn pak(mut self, builder : &mut pak_db::prelude::PakBuilder) -> pak_db::prelude::PakResult<pak_db::prelude::PakPointer> {
+    //     let bytes = vec![#(#fields_as_byte_list),*];
+    //     let indices = self.indices();
+    //     let pointer = builder.store_multiple(bytes, indices)?;
+    //     return Ok(pointer)
+    // }
+    
+    // fn unpak(pak : & pak_db::prelude::Pak, pointer : & pak_db::prelude::PakPointer) -> pak_db::prelude::PakResult<Self> {
+    //     let bytes : Vec<Vec<u8>> = pak.read_chunk(pointer)?;
+    //     let result = Self {
+    //         #(#field_from_bytes_list),*
+    //     };
+    //     Ok(result)
+    // }
+    
     quote! {
         impl ::pak_db::prelude::PakItem for #name {
             fn pak(mut self, builder : &mut pak_db::prelude::PakBuilder) -> pak_db::prelude::PakResult<pak_db::prelude::PakPointer> {
-                let bytes = vec![#(#fields_as_byte_list),*];
-                let pointer = builder.pak_no_search(bytes)?;
+                #(#fields_as_prelude_calls;)*
+                let bytes = pak_db::prelude::serialize(&self)?;
+                let indices = self.indices();
+                let pointer = builder.store::<Self>(bytes, indices)?;
                 return Ok(pointer)
             }
             
             fn unpak(pak : & pak_db::prelude::Pak, pointer : & pak_db::prelude::PakPointer) -> pak_db::prelude::PakResult<Self> {
-                let bytes : Vec<Vec<u8>> = pak.read_err(pointer)?;
-                let result = Self {
-                    #(#field_from_bytes_list),*
-                };
-                Ok(result)
+                pak.read_err::<Self>(pointer)
             }
             
             fn indices(&self) -> Vec<pak_db::prelude::PakIndex> {

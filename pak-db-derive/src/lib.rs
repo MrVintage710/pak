@@ -7,7 +7,7 @@ use trait_impl::impl_pak_item;
 
 mod trait_impl;
 
-#[proc_macro_derive(PakItem, attributes(index))]
+#[proc_macro_derive(PakItem, attributes(index, recursive))]
 pub fn pak_item_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // Parse the input tokens into a syntax tree
     let input_meta = parse_macro_input!(input as DeriveInput);

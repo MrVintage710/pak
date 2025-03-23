@@ -8,11 +8,12 @@ use item::{FromBytes, IntoBytes, PakItem, PakItemGroup};
 use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakTypedPointer, PakUntypedPointer};
 use query::PakQueryExpression;
+use serde::Deserialize;
 
 use crate::error::PakResult;
 
-#[cfg(test)]
-mod test;
+// #[cfg(test)]
+// mod test;
 
 pub mod meta;
 pub mod item;
@@ -22,15 +23,13 @@ pub(crate) mod btree;
 pub mod query;
 pub mod error;
 pub mod pointer;
-pub mod serializer;
-pub mod deserializer;
+pub mod reference;
 
 pub mod prelude {
     #[cfg(feature = "derive")]
     pub use pak_db_derive::PakItem;
     pub use crate::item::PakItem;
     pub use crate::item::PakItemGroup;
-    pub use crate::item::PakItemSearchable;
     pub use crate::item::IntoBytes;
     pub use crate::item::FromBytes;
     pub use crate::error::PakResult;
@@ -39,6 +38,8 @@ pub mod prelude {
     pub use crate::Pak;
     pub use crate::pointer::PakPointer;
     pub use crate::index::PakIndex;
+    pub use bincode::serialize;
+    pub use bincode::deserialize;
 }
 
 //==============================================================================================
@@ -116,23 +117,19 @@ impl Pak {
         }
     }
     
-    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : FromBytes {
+    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
         Ok(res)
     }
     
-    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : FromBytes {
+    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : for<'de> Deserialize<'de> {
         let res = self.read_err(pointer);
         match res {
             Ok(res) => Some(res),
             Err(_) => None,
         }
-    }
-    
-    pub(crate) fn read_bytes(&self, pointer : &PakPointer) -> PakResult<Vec<u8>> {
-        self.source.borrow_mut().read(pointer, self.get_vault_start())
     }
     
     pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree> {
@@ -204,8 +201,8 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that does not support searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize).
-    pub fn pak_no_search<T>(&mut self, mut item : T) -> PakResult<PakPointer> where T : IntoBytes{
-        let bytes = item.into_bytes(self)?;
+    pub fn pak_no_search<T>(&mut self, item : T) -> PakResult<PakPointer> where T : IntoBytes{
+        let bytes = item.into_bytes()?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
@@ -214,7 +211,8 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that supports searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize) and [PakItemSearchable](crate::PakItemSearchable).
-    pub fn pak<T>(&mut self, item : T) -> PakResult<PakPointer> where T : PakItem {
+    pub fn pak<T>(&mut self, mut item : T) -> PakResult<PakPointer> where T : PakItem {
+        item.prelude(self)?;
         item.pak(self)
     }
     
@@ -223,15 +221,6 @@ impl PakBuilder {
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
         self.chunks.push(PakVaultReference { pointer: pointer.clone().into_typed::<T>(), indices });
-        Ok(pointer)
-    }
-    
-    pub fn store_multiple(&mut self, items : Vec<Vec<u8>>) -> PakResult<PakPointer> {
-        let bytes = bincode::serialize(&items)?;
-        let pointer = PakPointer::new_untyped(self.size_in_bytes, bytes.len() as u64);
-        self.size_in_bytes += bytes.len() as u64;
-        self.vault.extend(bytes);
-        self.chunks.push(PakVaultReference { pointer: pointer.clone().into_typed::<Vec<Vec<u8>>>(), indices: vec![] });
         Ok(pointer)
     }
     

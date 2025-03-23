@@ -1,32 +1,42 @@
 use std::collections::HashSet;
 use impl_trait_for_tuples::impl_for_tuples;
-use serde::{de::DeserializeOwned, Serialize};
-use crate::{error::PakResult, pointer::PakPointer, Pak, PakBuilder};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::{error::PakResult, pointer::PakPointer, value::IntoPakValue, Pak, PakBuilder};
 use super::index::PakIndex;
 
-pub trait PakItem : Sized {
-    fn pak(self, builder : &mut PakBuilder) -> PakResult<PakPointer>;
-    
-    fn unpak(pak : &Pak, pointer : &PakPointer) -> PakResult<Self>;
-    
-    fn indices(&self) -> Vec<PakIndex>;
-}
-
-impl <T> PakItem for T where T : IntoBytes + FromBytes + PakItemSearchable {
-    fn indices(&self) -> Vec<PakIndex> {
-        PakItemSearchable::get_indices(self)
-    }
-
-    fn pak(mut self, builder : &mut PakBuilder) -> PakResult<PakPointer> {
-        let bytes = IntoBytes::into_bytes(&mut self, builder)?;
+#[allow(unused_variables)]
+pub trait PakItem where Self : Serialize + for<'de> Deserialize<'de> {
+    fn pak(self, builder : &mut PakBuilder) -> PakResult<PakPointer> {
+        let bytes = bincode::serialize(&self)?;
         let indices = self.indices();
         let pointer = builder.store::<Self>(bytes, indices)?;
         Ok(pointer)
     }
-
+    
     fn unpak(pak : &Pak, pointer : &PakPointer) -> PakResult<Self> {
-        let bytes = pak.read_bytes(pointer)?;
-        FromBytes::from_bytes(&bytes)
+        pak.read_err(pointer)
+    }
+    
+    fn prelude(&mut self, builder : &mut PakBuilder) -> PakResult<()> { Ok(()) }
+    
+    fn indices(&self) -> Vec<PakIndex>;
+}
+
+impl <T> PakItem for T where T : for<'de> Deserialize<'de> + Serialize + IntoPakValue {
+    fn indices(&self) -> Vec<PakIndex> {
+        Vec::new()
+    }
+}
+
+impl <T> PakItem for Vec<T> where T : PakItem {
+    
+    fn prelude(&mut self, builder : &mut PakBuilder) -> PakResult<()> {
+        for item in self.iter_mut() { item.prelude(builder)? }
+        Ok(())
+    }
+    
+    fn indices(&self) -> Vec<PakIndex> {
+        self.iter().map(|item| item.indices()).flatten().collect()
     }
 }
 
@@ -59,127 +69,16 @@ impl PakItemGroup for Tuple {
 }
 
 //==============================================================================================
-//        PakItemRef
-//==============================================================================================
-
-pub enum PakItemRef<T> where T : PakItem {
-    Ref(PakPointer),
-    Loaded(T),
-}
-
-impl <T> IntoBytes for PakItemRef<T> where T : PakItem {
-    fn into_bytes(&mut self, builder : &mut PakBuilder) -> PakResult<Vec<u8>> {
-        self.store(builder)?;
-        self.unwrap_pointer().into_bytes(builder)
-    }
-}
-
-impl <T> FromBytes for PakItemRef<T> where T : PakItem {
-    fn from_bytes(bytes : &[u8]) -> PakResult<Self> {
-        let pointer = PakPointer::from_bytes(bytes)?;
-        Ok(PakItemRef::Ref(pointer))
-    }
-}
-
-impl <T> PakItemSearchable for PakItemRef<T> where T : PakItem {
-    fn get_indices(&self) -> Vec<PakIndex> {
-        match self {
-            PakItemRef::Ref(_) => Vec::new(),
-            PakItemRef::Loaded(item) => item.indices(),
-        }
-    }
-}
-
-impl <T> PakItemRef<T> where T : PakItem {
-    
-    pub fn pointer(pointer : PakPointer) -> Self {
-        PakItemRef::Ref(pointer)
-    }
-    
-    pub fn load(&mut self, pak : &Pak) -> PakResult<()> {
-        match self {
-            PakItemRef::Ref(pointer) => {
-                let item = pak.unpak_err::<T>(pointer)?;
-                *self = PakItemRef::Loaded(item);
-                Ok(())
-            },
-            PakItemRef::Loaded(_) => Ok(())
-        }
-    }
-    
-    pub fn store(&mut self, builder : &mut PakBuilder) -> PakResult<()> {
-        if self.is_ref() { return Ok(()) };
-        let old = std::mem::replace(self, PakItemRef::pointer(PakPointer::default()));
-        let item = old.unwrap();
-        let pointer = builder.pak(item)?;
-        *self = PakItemRef::Ref(pointer);
-        Ok(())
-    }
-    
-    pub fn get(&self) -> &T {
-        match self {
-            PakItemRef::Ref(_) => panic!("Tried to get a value of Ref"),
-            PakItemRef::Loaded(item) => item,
-        }
-    }
-    
-    pub fn get_mut(&mut self) -> &mut T {
-        match self {
-            PakItemRef::Ref(_) => panic!("Tried to get a value of Ref"),
-            PakItemRef::Loaded(item) => item,
-        }
-    }
-    
-    pub fn unwrap(self) -> T {
-        match self {
-            PakItemRef::Ref(_) => panic!("Tried to get a value of Ref"),
-            PakItemRef::Loaded(item) => item,
-        }
-    }
-    
-    pub fn unwrap_pointer(&self) -> &PakPointer {
-        match self {
-            PakItemRef::Ref(pointer) => pointer,
-            PakItemRef::Loaded(_) => panic!("Tried to get a pointer of Loaded"),
-        }
-    }
-    
-    pub fn unwrap_or_load(self, pak : &Pak) -> PakResult<T> {
-        match self {
-            PakItemRef::Ref(pointer) => {
-                let item = pak.unpak_err::<T>(&pointer)?;
-                Ok(item)
-            },
-            PakItemRef::Loaded(item) => Ok(item),
-        }
-    }
-    
-    pub fn is_loaded(&self) -> bool {
-        match self {
-            PakItemRef::Ref(_) => false,
-            PakItemRef::Loaded(_) => true,
-        }
-    }
-    
-    pub fn is_ref(&self) -> bool {
-        match self {
-            PakItemRef::Ref(_) => true,
-            PakItemRef::Loaded(_) => false,
-        }
-    }
-}
-
-//==============================================================================================
 //        IntoBytes
 //==============================================================================================
 
 pub trait IntoBytes {
-    fn into_bytes(&mut self, builder : &mut PakBuilder) -> PakResult<Vec<u8>>;
+    fn into_bytes(&self) -> PakResult<Vec<u8>>;
 }
 
 #[cfg(feature = "serde")]
 impl <T> IntoBytes for T where T : Serialize {
-    fn into_bytes(&mut self, _ : &mut PakBuilder) -> PakResult<Vec<u8>> {
+    fn into_bytes(&self) -> PakResult<Vec<u8>> {
         bincode::serialize(self).map_err(|e| e.into())
     }
 }
@@ -226,14 +125,6 @@ impl FromBytes for Vec<Vec<u8>> {
         let obj : Self = bincode::deserialize::<Self>(bytes)?;
         Ok(obj)
     }
-}
-
-//==============================================================================================
-//        PakItemSearchable
-//==============================================================================================
-
-pub trait PakItemSearchable {
-    fn get_indices(&self) -> Vec<PakIndex>;
 }
 
 
