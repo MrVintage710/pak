@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::{collections::{HashSet, VecDeque}, ops::DerefMut};
 use impl_trait_for_tuples::impl_for_tuples;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use crate::{error::PakResult, pointer::PakPointer, value::IntoPakValue, Pak, PakBuilder};
 use super::index::PakIndex;
 
@@ -29,7 +29,17 @@ impl <T> PakItem for T where T : for<'de> Deserialize<'de> + Serialize + IntoPak
 }
 
 impl <T> PakItem for Vec<T> where T : PakItem {
+    fn prelude(&mut self, builder : &mut PakBuilder) -> PakResult<()> {
+        for item in self.iter_mut() { item.prelude(builder)? }
+        Ok(())
+    }
     
+    fn indices(&self) -> Vec<PakIndex> {
+        self.iter().map(|item| item.indices()).flatten().collect()
+    }
+}
+
+impl <T> PakItem for VecDeque<T> where T : PakItem {
     fn prelude(&mut self, builder : &mut PakBuilder) -> PakResult<()> {
         for item in self.iter_mut() { item.prelude(builder)? }
         Ok(())
@@ -67,64 +77,3 @@ impl PakItemGroup for Tuple {
         Ok(for_tuples!((#(Tuple::collect(pak, pointers.clone())?),*)))
     }
 }
-
-//==============================================================================================
-//        IntoBytes
-//==============================================================================================
-
-pub trait IntoBytes {
-    fn into_bytes(&self) -> PakResult<Vec<u8>>;
-}
-
-#[cfg(feature = "serde")]
-impl <T> IntoBytes for T where T : Serialize {
-    fn into_bytes(&self) -> PakResult<Vec<u8>> {
-        bincode::serialize(self).map_err(|e| e.into())
-    }
-}
-
-#[cfg(not(feature = "serde"))]
-impl IntoBytes for Vec<Vec<u8>> {
-    fn into_bytes(&mut self, _ : &mut PakBuilder) -> PakResult<Vec<u8>> {
-        Ok(bincode::serialize(self)?)
-    }
-}
-
-#[cfg(not(feature = "serde"))]
-impl <T> IntoBytes for Vec<T> where T : IntoBytes {
-    fn into_bytes(&mut self, builder : &mut PakBuilder) -> PakResult<Vec<u8>> {
-        let mut bytes = vec![];
-        for i in self {
-            bytes.extend(i.into_bytes(builder)?);
-        }
-        Ok(bincode::serialize(&bytes)?)
-    }
-}
-
-//==============================================================================================
-//        FromBytes
-//==============================================================================================
-
-pub trait FromBytes: Sized {
-    fn from_bytes(bytes: &[u8]) -> PakResult<Self>;
-}
-
-#[cfg(feature = "serde")]
-impl <T> FromBytes for T where T : DeserializeOwned {
-    fn from_bytes(bytes: &[u8]) -> PakResult<Self> {
-        let obj : Self = bincode::deserialize::<Self>(bytes)?;
-        Ok(obj)
-    }
-}
-
-///This implementation is need for derive beheviors to 
-#[cfg(not(feature = "serde"))]
-#[cfg(feature = "derive")]
-impl FromBytes for Vec<Vec<u8>> {
-    fn from_bytes(bytes: &[u8]) -> PakResult<Self> {
-        let obj : Self = bincode::deserialize::<Self>(bytes)?;
-        Ok(obj)
-    }
-}
-
-

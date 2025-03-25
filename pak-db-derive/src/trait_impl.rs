@@ -51,7 +51,11 @@ pub fn impl_pak_item(name : &Ident, data : &Data) -> TokenStream {
         let field_name_str = field_name.to_string();
         let field_span = f.span;
         quote_spanned! {field_span => ::pak_db::index::PakIndex::new(#field_name_str, self.#field_name.clone())}
-    });
+    }).collect::<Vec<_>>();
+    
+    if field_to_indices_list.len() == 0 {
+        panic!("There are no fields labeled as an 'index'. This will make the item unsearchable.")
+    }
     
     // fn pak(mut self, builder : &mut pak_db::prelude::PakBuilder) -> pak_db::prelude::PakResult<pak_db::prelude::PakPointer> {
     //     let bytes = vec![#(#fields_as_byte_list),*];
@@ -71,11 +75,15 @@ pub fn impl_pak_item(name : &Ident, data : &Data) -> TokenStream {
     quote! {
         impl ::pak_db::prelude::PakItem for #name {
             fn pak(mut self, builder : &mut pak_db::prelude::PakBuilder) -> pak_db::prelude::PakResult<pak_db::prelude::PakPointer> {
-                #(#fields_as_prelude_calls;)*
                 let bytes = pak_db::prelude::serialize(&self)?;
                 let indices = self.indices();
                 let pointer = builder.store::<Self>(bytes, indices)?;
                 return Ok(pointer)
+            }
+            
+            fn prelude(&mut self, builder : &mut PakBuilder) -> pak_db::prelude::PakResult<()> {
+                #(#fields_as_prelude_calls;)*
+                Ok(())
             }
             
             fn unpak(pak : & pak_db::prelude::Pak, pointer : & pak_db::prelude::PakPointer) -> pak_db::prelude::PakResult<Self> {

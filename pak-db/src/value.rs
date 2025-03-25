@@ -184,11 +184,11 @@ impl PakValue {
 //==============================================================================================
 
 pub trait IntoPakValue {
-    fn into_pak_value(self) -> PakValue;
+    fn into_pak_value(&self) -> PakValue;
 }
 
 impl <T> IntoPakValue for Option<T> where T : IntoPakValue {
-    fn into_pak_value(self) -> PakValue {
+    fn into_pak_value(&self) -> PakValue {
         match self {
             Some(value) => value.into_pak_value(),
             None => PakValue::Void,
@@ -196,86 +196,92 @@ impl <T> IntoPakValue for Option<T> where T : IntoPakValue {
     }
 }
 
-impl <T> IntoPakValue for T where T : Into<PakValue> {
-    fn into_pak_value(self) -> PakValue {
-        self.into()
+impl <T> IntoPakValue for &T where T : IntoPakValue {
+    fn into_pak_value(&self) -> PakValue {
+        (*self).into_pak_value()
     }
 }
 
-impl<'s> From<&'s str> for PakValue {
-    fn from(value: &'s str) -> Self {
-        PakValue::String(value.to_string())
+impl <T> IntoPakValue for &mut T where T : IntoPakValue {
+    fn into_pak_value(&self) -> PakValue {
+        (**self).into_pak_value()
     }
 }
 
-impl From<String> for PakValue {
-    fn from(value: String) -> Self {
-        PakValue::String(value)
+impl IntoPakValue for &str {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::String(self.to_string())
     }
 }
 
-impl From<f64> for PakValue {
-    fn from(value: f64) -> Self {
-        PakValue::Float(value.to_bits())
+impl IntoPakValue for String {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::String(self.clone())
     }
 }
 
-impl From<f32> for PakValue {
-    fn from(value: f32) -> Self {
-        PakValue::Float((value as f64).to_bits())
+impl IntoPakValue for f64 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Float(self.to_bits())
     }
 }
 
-impl From<i64> for PakValue {
-    fn from(value: i64) -> Self {
-        PakValue::Int(value)
+impl IntoPakValue for f32 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Float((*self as f64).to_bits())
     }
 }
 
-impl From<i32> for PakValue {
-    fn from(value: i32) -> Self {
-        PakValue::Int(value as i64)
+impl IntoPakValue for i64 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Int(*self)
     }
 }
 
-impl From<i16> for PakValue {
-    fn from(value: i16) -> Self {
-        PakValue::Int(value as i64)
+impl IntoPakValue for i32 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Int(*self as i64)
     }
 }
 
-impl From<i8> for PakValue {
-    fn from(value: i8) -> Self {
-        PakValue::Int(value as i64)
+impl IntoPakValue for i16 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Int(*self as i64)
     }
 }
 
-impl From<u64> for PakValue {
-    fn from(value: u64) -> Self {
-        PakValue::Uint(value as u64)
+impl IntoPakValue for i8 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Int(*self as i64)
     }
 }
 
-impl From<u32> for PakValue {
-    fn from(value: u32) -> Self {
-        PakValue::Uint(value as u64)
+impl IntoPakValue for u64 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Uint(*self)
     }
 }
 
-impl From<u16> for PakValue {
-    fn from(value: u16) -> Self {
-        PakValue::Uint(value as u64)
+impl IntoPakValue for u32 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Uint(*self as u64)
     }
 }
 
-impl From<u8> for PakValue {
-    fn from(value: u8) -> Self {
-        PakValue::Uint(value as u64)
+impl IntoPakValue for u16 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Uint(*self as u64)
     }
 }
 
-impl From<bool> for PakValue {
-    fn from(value: bool) -> Self {
-        PakValue::Boolean(value)
+impl IntoPakValue for u8 {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Uint(*self as u64)
+    }
+}
+
+impl IntoPakValue for bool {
+    fn into_pak_value(&self) -> PakValue {
+        PakValue::Boolean(*self)
     }
 }

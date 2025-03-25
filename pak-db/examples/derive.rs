@@ -2,6 +2,12 @@ use pak_db::{index::PakIndexIdentifier, reference::PakItemRef, PakBuilder};
 use pak_db_derive::PakItem;
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, PakItem, Debug)]
+pub struct Hobby {
+    #[index]
+    name: String,
+}
+
 #[derive(Serialize, Deserialize, PakItem, Debug, Clone)]
 pub struct Pet {
     #[index]

@@ -4,11 +4,11 @@
 use std::{cell::RefCell, collections::HashMap, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
 use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
-use item::{FromBytes, IntoBytes, PakItem, PakItemGroup};
+use item::{PakItem, PakItemGroup};
 use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakTypedPointer, PakUntypedPointer};
 use query::PakQueryExpression;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::PakResult;
 
@@ -24,14 +24,13 @@ pub mod query;
 pub mod error;
 pub mod pointer;
 pub mod reference;
+pub mod chunk;
 
 pub mod prelude {
     #[cfg(feature = "derive")]
     pub use pak_db_derive::PakItem;
     pub use crate::item::PakItem;
     pub use crate::item::PakItemGroup;
-    pub use crate::item::IntoBytes;
-    pub use crate::item::FromBytes;
     pub use crate::error::PakResult;
     pub use crate::error::PakError;
     pub use crate::PakBuilder;
@@ -120,7 +119,7 @@ impl Pak {
     pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
-        let res = T::from_bytes(&buffer)?;
+        let res = bincode::deserialize(&buffer)?;
         Ok(res)
     }
     
@@ -201,8 +200,8 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that does not support searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize).
-    pub fn pak_no_search<T>(&mut self, item : T) -> PakResult<PakPointer> where T : IntoBytes{
-        let bytes = item.into_bytes()?;
+    pub fn pak_no_search<T>(&mut self, item : T) -> PakResult<PakPointer> where T : Serialize{
+        let bytes = bincode::serialize(&item)?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
