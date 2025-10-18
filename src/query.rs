@@ -96,6 +96,7 @@ pub enum PakQuery {
     LessThan(String, PakValue),
     GreaterThanEqual(String, PakValue),
     LessThanEqual(String, PakValue),
+    Contains(String, PakValue)
 }
 
 impl PakQuery {
@@ -117,6 +118,10 @@ impl PakQuery {
     
     pub fn less_than_or_equal(key : &str, value : impl Into<PakValue>) -> Self {
         PakQuery::LessThanEqual(key.to_string(), value.into())
+    }
+    
+    pub fn contains(key : &str, value : impl Into<PakValue>) -> Self {
+        PakQuery::Contains(key.to_string(), value.into())
     }
 }
 
@@ -163,6 +168,10 @@ impl PakQueryExpression for PakQuery {
                 let tree = pak.get_tree(key)?;
                 tree.get_less_eq(pak_value)
             },
+            PakQuery::Contains(key, pak_value) => {
+                let tree = pak.get_tree(key)?;
+                tree.get_contains(pak_value)
+            }
         }
     }
 }

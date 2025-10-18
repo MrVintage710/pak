@@ -12,6 +12,7 @@ pub enum PakValue {
     Int(i64),
     Uint(u64),
     Boolean(bool),
+    Array(Vec<PakValue>),
     #[default]
     Void
 }
@@ -30,6 +31,15 @@ impl PartialEq for PakValue {
             (PakValue::Uint(a), PakValue::Int(b)) => *a as i64 == *b,
             (PakValue::Uint(a), PakValue::Uint(b)) => a == b,
             (PakValue::Boolean(a), PakValue::Boolean(b)) => a == b,
+            (PakValue::Array(a), PakValue::Array(b)) => a == b,
+            (PakValue::Array(a), _) => {
+                let Some(first) = a.first() else { return false };
+                first == other
+            },
+            (_, PakValue::Array(b)) => {
+                let Some(first) = b.first() else { return false };
+                self == first
+            },
             (PakValue::Void, PakValue::Void) => true,
             _ => false,
         }
@@ -44,6 +54,7 @@ impl Debug for PakValue {
             PakValue::Int(int) => int.fmt(f),
             PakValue::Uint(uint) => uint.fmt(f),
             PakValue::Boolean(boolean) => boolean.fmt(f),
+            PakValue::Array(string_array) => string_array.fmt(f),
             PakValue::Void => f.write_str("Void"),
         }
     }
@@ -63,6 +74,15 @@ impl PartialOrd for PakValue {
             (PakValue::Uint(a), PakValue::Int(b)) => (*a as i64).partial_cmp(&(*b as i64)),
             (PakValue::Uint(a), PakValue::Uint(b)) => a.partial_cmp(b),
             (PakValue::Boolean(a), PakValue::Boolean(b)) => a.partial_cmp(b),
+            (PakValue::Array(a), PakValue::Array(b)) => a.partial_cmp(b),
+            (PakValue::Array(a), _) => {
+                let Some(first) = a.first() else { return None };
+                first.partial_cmp(other)
+            },
+            (_, PakValue::Array(b)) => {
+                let Some(first) = b.first() else { return None };
+                self.partial_cmp(first)
+            }
             (PakValue::Void, PakValue::Void) => Some(std::cmp::Ordering::Equal),
             _ => None,
         }
@@ -79,6 +99,41 @@ impl Ord for PakValue {
 
 
 impl PakValue {
+    pub fn is_array(&self) -> bool {
+        matches!(self, PakValue::Array(_))
+    }
+    
+    pub fn is_integer(&self) -> bool {
+        matches!(self, PakValue::Int(_))
+    }
+    
+    pub fn is_unsigned_integer(&self) -> bool {
+        matches!(self, PakValue::Uint(_))
+    }
+    
+    pub fn is_string(&self) -> bool {
+        matches!(self, PakValue::String(_))
+    }
+    
+    pub fn is_float(&self) -> bool {
+        matches!(self, PakValue::Float(_))
+    }
+    
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, PakValue::Boolean(_))
+    }
+    
+    pub fn is_void(&self) -> bool {
+        matches!(self, PakValue::Void)
+    }
+    
+    pub fn as_array(&self) -> Option<&[PakValue]> {
+        match self {
+            PakValue::Array(array) => Some(array),
+            _ => None,
+        }
+    }
+    
     pub fn as_string(&self) -> Option<String> {
         match self {
             PakValue::String(value) => Some(value.clone()),
@@ -177,6 +232,30 @@ impl PakValue {
         let i : u64 = integer.into();
         Self::Uint(i)
     }
+    
+    pub fn contains(&self, value : &PakValue) -> bool {
+        match (self, value) {
+            (PakValue::String(a), PakValue::String(b)) => a.contains(b),
+            (PakValue::String(a), PakValue::Int(b)) => a.contains(&b.to_string()),
+            (PakValue::String(a), PakValue::Float(b)) => a.contains(&b.to_string()),
+            (PakValue::String(a), PakValue::Uint(b)) => a.contains(&b.to_string()),
+            (PakValue::String(a), PakValue::Boolean(b)) => a.contains(&b.to_string()),
+            (PakValue::Array(a), _) => a.contains(value),
+            _ => false
+        }
+    }
+    
+    pub fn to_string(&self) -> Option<String> {
+        match self {
+            PakValue::String(a) => Some(a.clone()),
+            PakValue::Int(a) => Some(a.to_string()),
+            PakValue::Uint(a) => Some(a.to_string()),
+            PakValue::Float(a) => Some(a.to_string()),
+            PakValue::Boolean(a) => Some(a.to_string()),
+            PakValue::Void => Some("Void".to_string()),
+            _ => None
+        }
+    }
 }
 
 //==============================================================================================
@@ -199,6 +278,12 @@ impl <T> IntoPakValue for Option<T> where T : IntoPakValue {
 impl <T> IntoPakValue for T where T : Into<PakValue> {
     fn into_pak_value(self) -> PakValue {
         self.into()
+    }
+}
+
+impl <T> IntoPakValue for Vec<T> where T : IntoPakValue {
+    fn into_pak_value(self) -> PakValue {
+        PakValue::Array(self.into_iter().map(|value| value.into_pak_value()).collect())
     }
 }
 
