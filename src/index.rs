@@ -51,6 +51,10 @@ pub trait PakIndexIdentifier {
     fn less_than_or_equal<V>(&self, other: V) -> PakQuery where V : IntoPakValue {
         PakQuery::less_than_or_equal(self.identifier(), other.into_pak_value())
     }
+    
+    fn contains_value<V>(&self, other : V) -> PakQuery where V : IntoPakValue {
+        PakQuery::contains(self.identifier(), other.into_pak_value())
+    }
 }
 
 impl PakIndexIdentifier for String {

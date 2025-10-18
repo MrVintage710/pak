@@ -127,7 +127,7 @@ impl <'p> PakTree<'p> {
                 entry.values.clone().into_iter().for_each(|value| {set.insert(value);});
                 if let Some(index) = entry.previous {
                     let pointer = self.meta.pages.get(&index).unwrap();
-                    self.get_less_r(value, *pointer, set, match_eq)?;
+                    self.get_greater_r(value, *pointer, set, match_eq)?;
                 }
                 continue;
             } else {
@@ -141,6 +141,29 @@ impl <'p> PakTree<'p> {
         if let Some(index) = page.next {
             let pointer = self.meta.pages.get(&index).unwrap();
             return self.get_greater_r(value, *pointer, set, match_eq);
+        }
+        
+        Ok(())
+    }
+    
+    pub fn get_contains(&self, value : &PakValue) -> PakResult<HashSet<PakTypedPointer>> {
+        let pointer = self.meta.pages.get(&0).unwrap();
+        let mut results = HashSet::new();
+        self.get_contains_r(value, *pointer, &mut results)?;
+        Ok(results)
+    }
+    
+    fn get_contains_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut HashSet<PakTypedPointer>) -> PakResult<()> {
+        let page : PakTreePage = self.pak.read_err(&current_page.as_pointer())?;
+        
+        for entry in page.values {
+            if entry.key.contains(value) {
+                entry.values.clone().into_iter().for_each(|value| {set.insert(value);});
+                if let Some(index) = entry.previous {
+                    let pointer = self.meta.pages.get(&index).unwrap();
+                    self.get_contains_r(value, *pointer, set)?;
+                }
+            }
         }
         
         Ok(())
