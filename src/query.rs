@@ -1,7 +1,9 @@
 #![doc = include_str!("../docs/queries.md")]
 
-use std::{collections::HashSet, ops::{BitAnd, BitOr}};
-use crate::{error::PakResult, pointer::PakTypedPointer};
+use std::{ops::{BitAnd, BitOr}};
+use ordermap::OrderSet;
+
+use crate::{error::PakResult, pointer::PakPointer};
 use super::{value::PakValue, Pak};
 
 //==============================================================================================
@@ -9,16 +11,20 @@ use super::{value::PakValue, Pak};
 //==============================================================================================
 
 pub trait PakQueryExpression {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>>;
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>>;
 }
+
+//==============================================================================================
+//        PakQueryUnion
+//==============================================================================================
 
 pub struct PakQueryUnion(Box<dyn PakQueryExpression>, Box<dyn PakQueryExpression>);
 
 impl PakQueryExpression for PakQueryUnion {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
-        let results = results_a.into_iter().chain(results_b.into_iter()).collect::<HashSet<_>>();
+        let results = results_a.into_iter().chain(results_b.into_iter()).collect::<OrderSet<_>>();
         Ok(results)
     }
 }
@@ -54,7 +60,7 @@ impl <B> BitOr<B> for PakQuery where B : PakQueryExpression + 'static {
 pub struct PakQueryIntersection(Box::<dyn PakQueryExpression>, Box::<dyn PakQueryExpression>);
 
 impl PakQueryExpression for PakQueryIntersection {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
         Ok(results_a.into_iter().filter(|e| results_b.contains(e)).collect())
@@ -146,7 +152,7 @@ pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
 }
 
 impl PakQueryExpression for PakQuery {
-    fn execute(&self, pak : &Pak) -> PakResult<HashSet<PakTypedPointer>> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         match self {
             PakQuery::Equal(key, pak_value) => {
                 let tree = pak.get_tree(key)?;

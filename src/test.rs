@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, value::{IntoPakValue, PakValue}, Pak, PakBuilder};
+use crate::{Pak, PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::{PakItemSearchable}, pointer::PakPointer, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -181,7 +181,7 @@ pub fn build_data_base() -> (Pak, PakPointer, PakPointer) {
 #[test]
 fn pak_read() {
     let (pak, john_doe, _) = build_data_base();
-    let person : Person = pak.read_err(&john_doe).unwrap();
+    let person = pak.read_err::<Person>(&john_doe).unwrap();
     
     assert_eq!(person.first_name, "John");
     assert_eq!(person.last_name, "Doe");
@@ -267,4 +267,12 @@ fn compound_intersection_query() {
     
     assert_eq!(people.len(), 2);
     assert_eq!(pets.len(), 0);
+}
+
+#[test]
+fn single_query() {
+    let (pak, _, _) = build_data_base();
+    
+    let query = "name".contains_value("J");
+    let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
 }

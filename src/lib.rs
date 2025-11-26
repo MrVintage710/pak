@@ -6,7 +6,7 @@ use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
 use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
 use meta::{PakMeta, PakSizing};
-use pointer::{PakPointer, PakTypedPointer, PakUntypedPointer};
+use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
 
 use crate::error::PakResult;
@@ -56,7 +56,7 @@ impl Pak {
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
     pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
-        let pointers = query.execute(self)?.into_iter().map(|i| i.into_pointer()).collect();
+        let pointers = query.execute(self)?.into_iter().collect();
         T::deserialize_group(self, pointers)
     }
     
@@ -85,15 +85,15 @@ impl Pak {
         &self.meta.description
     }
     
-    pub(crate) fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemDeserialize {
+    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemDeserialize {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
         Ok(res)
     }
     
-    pub(crate) fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : PakItemDeserialize {
-        let res = self.read_err(pointer);
+    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : PakItemDeserialize {
+        let res = self.read_err::<T>(pointer);
         match res {
             Ok(res) => Some(res),
             Err(_) => None,
@@ -174,7 +174,7 @@ impl PakBuilder {
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
-        self.chunks.push(PakVaultReference { pointer: pointer.clone().into_typed::<T>(), indices: vec![] });
+        self.chunks.push(PakVaultReference { pointer: pointer.clone(), indices: vec![] });
         Ok(pointer)
     }
     
@@ -185,7 +185,7 @@ impl PakBuilder {
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
-        self.chunks.push(PakVaultReference { pointer: pointer.clone().into_typed::<T>(), indices: indices.clone() });
+        self.chunks.push(PakVaultReference { pointer: pointer.clone(), indices: indices.clone() });
         Ok(pointer)
     }
     
@@ -309,6 +309,6 @@ impl PakBuilder {
 
 #[derive(Debug, Clone)]
 pub(crate) struct PakVaultReference {
-    pointer : PakTypedPointer,
+    pointer : PakPointer,
     indices : Vec<PakIndex>
 }

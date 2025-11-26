@@ -1,4 +1,7 @@
+use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
+
+use crate::{error::PakResult, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
@@ -69,6 +72,12 @@ impl Clone for PakPointer {
             Self::Typed(ptr) => Self::Typed(ptr.clone()),
             Self::Untyped(ptr) => Self::Untyped(*ptr),
         }
+    }
+}
+
+impl PakQueryExpression for PakPointer {
+    fn execute(&self, _pak : &crate::Pak) -> PakResult<OrderSet<PakPointer>> {
+        Ok(OrderSet::from([self.clone()]))
     }
 }
 
