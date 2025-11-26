@@ -1,6 +1,8 @@
-#![doc = include_str!("../docs/queries.md")]
+#![doc = include_str!("../../docs/queries.md")]
 
-use std::{ops::{BitAnd, BitOr}};
+pub mod pql;
+
+use std::{ops::{BitAnd, BitOr}, rc::Rc, sync::Arc};
 use ordermap::OrderSet;
 
 use crate::{error::PakResult, pointer::PakPointer};
@@ -12,6 +14,52 @@ use super::{value::PakValue, Pak};
 
 pub trait PakQueryExpression {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>>;
+}
+
+impl PakQueryExpression for Box<dyn PakQueryExpression> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        self.as_ref().execute(pak)
+    }
+}
+
+impl PakQueryExpression for Rc<dyn PakQueryExpression> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        Rc::as_ref(&self).execute(pak)
+    }
+}
+
+impl PakQueryExpression for Arc<dyn PakQueryExpression> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        Arc::as_ref(&self).execute(pak)
+    }
+}
+
+impl <T> PakQueryExpression for Box<T> where T : PakQueryExpression {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        self.as_ref().execute(pak)
+    }
+}
+
+impl <T> PakQueryExpression for Rc<T> where T : PakQueryExpression  {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        Rc::as_ref(&self).execute(pak)
+    }
+}
+
+impl <T> PakQueryExpression for Arc<T> where T : PakQueryExpression {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        Arc::as_ref(&self).execute(pak)
+    }
+}
+
+//==============================================================================================
+//        Query From String
+//==============================================================================================
+
+pub fn query_from_pql(pql : &str) -> Box<dyn PakQueryExpression> {
+    
+    
+    todo!()
 }
 
 //==============================================================================================

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{Pak, PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::{PakItemSearchable}, pointer::PakPointer, value::{IntoPakValue, PakValue}};
+use crate::{Pak, PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::{self, query_from_pql}, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -270,9 +270,10 @@ fn compound_intersection_query() {
 }
 
 #[test]
-fn single_query() {
+fn pql_query() {
     let (pak, _, _) = build_data_base();
+    let pql = "(age > 25 & first_name = John) | first_name = Jane";
     
-    let query = "name".contains_value("J");
-    let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
+    let query = query_from_pql(pql);
+    let people = pak.query::<(Person, )>(query).unwrap();
 }
