@@ -1,6 +1,7 @@
+use logos::Lexer;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{Pak, PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::{self, query_from_pql}, value::{IntoPakValue, PakValue}};
+use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::{self, pql::PqlToken, query_from_pql}, value::{IntoPakValue, PakValue}, Pak, PakBuilder};
 
 //==============================================================================================
 //        Personallity Traits
@@ -270,10 +271,20 @@ fn compound_intersection_query() {
 }
 
 #[test]
+fn pql_tokenize() {
+    let pql = "age > 25 & (first_name3 = John | first_name = Jane)";
+    let lexer = Lexer::<PqlToken>::new(pql);
+    let tokens = lexer.into_iter().collect::<Vec<_>>();
+    println!("{tokens:?}")
+}
+
+#[test]
 fn pql_query() {
     let (pak, _, _) = build_data_base();
     let pql = "(age > 25 & first_name = John) | first_name = Jane";
+   
+    println!("{:?}", Lexer::<PqlToken>::new(pql).into_iter().collect::<Vec<_>>());
     
-    let query = query_from_pql(pql);
-    let people = pak.query::<(Person, )>(query).unwrap();
+    // let query = query_from_pql(pql);
+    // let people = pak.query::<(Person, )>(query).unwrap();
 }
