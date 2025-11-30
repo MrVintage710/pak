@@ -3,7 +3,7 @@ use std::iter::Peekable;
 
 use logos::{Lexer, Logos};
 
-use crate::{error::{PakError, PakResult, PqlError, PqlResult}, query::PakQueryExpression, value::PakValue};
+use crate::{error::{PakError, PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryExpression, PakQueryIntersection, PakQueryUnion}, value::PakValue};
 
 //==============================================================================================
 //        PQL Tokens
@@ -71,15 +71,22 @@ fn float(lex : &mut Lexer<PqlToken>) -> Option<f64> {
 
 
 //==============================================================================================
+//        Parse Function
+//==============================================================================================
+
+pub fn pql(source : &str) -> PakResult<Box<dyn PakQueryExpression>> {
+    let mut lexer = Lexer::new(source).peekable();
+    match PqlQuery::parse(&mut lexer) {
+        Ok(query) => Ok(query.eval()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+//==============================================================================================
 //        Pql parsing Common
 //==============================================================================================
 
 type TokenResult = Result<PqlToken, ()>;
-
-enum Binary<A, B> {
-    First(A),
-    Second(B)
-}
 
 fn next_is<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>, token : &PqlToken) -> PqlResult<bool> {
     let Some(Ok(t)) = lexer.peek() else { return Err(PqlError::EndOfFile.into()) };
@@ -96,19 +103,29 @@ enum PqlQuery {
     Group(Box<PqlGroup>)
 }
 
-fn parse_query<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlQuery> {
-    let group = parse_group(lexer);
-    match group {
-        Ok(group) => return Ok(PqlQuery::Group(Box::new(group))),
-        Err(PqlError::NoMatch) => {},
-        Err(err) => return Err(err), 
-    };
-    let expression = parse_expression(lexer);
-    match expression {
-        Ok(expression) => Ok(PqlQuery::Expression(Box::new(expression))),
-        Err(err) => Err(err),
+impl PqlQuery {
+    fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlQuery> {
+        let group = PqlGroup::parse(lexer);
+        match group {
+            Ok(group) => return Ok(PqlQuery::Group(Box::new(group))),
+            Err(PqlError::NoMatch) => {},
+            Err(err) => return Err(err), 
+        };
+        let expression = PqlExpression::parse(lexer);
+        match expression {
+            Ok(expression) => Ok(PqlQuery::Expression(Box::new(expression))),
+            Err(err) => Err(err),
+        }
     }
-} 
+    
+    fn eval(self) -> Box<dyn PakQueryExpression> {
+        match self {
+            PqlQuery::Expression(pql_expression) => pql_expression.eval(),
+            PqlQuery::Group(pql_group) => pql_group.eval(),
+        }
+    }
+}
+
 
 //==============================================================================================
 //        PqlGroup
@@ -117,14 +134,21 @@ fn parse_query<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> Pql
 #[derive(Debug)]
 struct PqlGroup(PqlQuery);
 
-fn parse_group<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlGroup> {
-    if !next_is(lexer, &PqlToken::GroupStart)? { return Err(PqlError::NoMatch) } 
-    lexer.next();
-    let query = parse_query(lexer)?;
-    if !next_is(lexer, &PqlToken::GroupEnd)? { return Err(PqlError::UnexpectedToken(lexer.next().unwrap().unwrap(), ")".to_string())) }
-    lexer.next();
-    Ok(PqlGroup(query))
+impl PqlGroup {
+    fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlGroup> {
+        if !next_is(lexer, &PqlToken::GroupStart)? { return Err(PqlError::NoMatch) } 
+        lexer.next();
+        let query = PqlQuery::parse(lexer)?;
+        if !next_is(lexer, &PqlToken::GroupEnd)? { return Err(PqlError::UnexpectedToken(lexer.next().unwrap().unwrap(), ")".to_string())) }
+        lexer.next();
+        Ok(PqlGroup(query))
+    }
+    
+    fn eval(self) -> Box<dyn PakQueryExpression> {
+        self.0.eval()
+    }
 }
+
 
 //==============================================================================================
 //        Expression
@@ -136,13 +160,30 @@ struct PqlExpression {
     second : Option<(PqlToken, PqlQuery)>
 }
 
-fn parse_expression<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlExpression> {
-    let first = parse_statement(lexer)?;
-    if !(next_is(lexer, &PqlToken::Or)? || next_is(lexer, &PqlToken::And)?) { return Ok(PqlExpression { first, second: None }) }
-    let Some(Ok(op)) = lexer.next() else { return Ok(PqlExpression { first, second: None })};
-    let second = parse_query(lexer)?;
-    Ok(PqlExpression { first, second : Some((op, second)) })
+impl PqlExpression {
+    fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlExpression> {
+        let first = PqlStatement::parse(lexer)?;
+        if !(next_is(lexer, &PqlToken::Or)? || next_is(lexer, &PqlToken::And)?) { return Ok(PqlExpression { first, second: None }) }
+        let Some(Ok(op)) = lexer.next() else { return Ok(PqlExpression { first, second: None })};
+        let second = PqlQuery::parse(lexer)?;
+        Ok(PqlExpression { first, second : Some((op, second)) })
+    }
+    
+    fn eval(self) -> Box<dyn PakQueryExpression> {
+        let first = self.first.eval();
+        if let Some((op, second)) = self.second {
+            let second = second.eval();
+            match op {
+                PqlToken::And => Box::new(PakQueryUnion::new(first, second)),
+                PqlToken::Or => Box::new(PakQueryIntersection::new(first, second)),
+                _ => unreachable!()
+            }
+        } else {
+            Box::new(first)
+        }
+    }
 }
+
 
 //==============================================================================================
 //        Statement
@@ -155,12 +196,27 @@ struct PqlStatement {
     value : PakValue
 }
 
-fn parse_statement<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlStatement> {
-    let key = parse_text(lexer)?;
-    let op = parse_statement_op(lexer)?;
-    let value = parse_value(lexer)?;
-    Ok(PqlStatement { key, op, value })
+impl PqlStatement {
+    fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlStatement> {
+        let key = parse_text(lexer)?;
+        let op = parse_statement_op(lexer)?;
+        let value = parse_value(lexer)?;
+        Ok(PqlStatement { key, op, value })
+    }
+    
+    fn eval(self) -> Box<dyn PakQueryExpression> {
+        let query = match self.op {
+            PqlToken::Eq => PakQuery::Equal(self.key, self.value),
+            PqlToken::Less => PakQuery::LessThan(self.key, self.value),
+            PqlToken::LessEq => PakQuery::LessThanEqual(self.key, self.value),
+            PqlToken::Greater => PakQuery::GreaterThan(self.key, self.value),
+            PqlToken::GreaterEq => PakQuery::GreaterThanEqual(self.key, self.value),
+            _ => unreachable!()
+        };
+        Box::new(query)
+    }
 }
+
 
 //==============================================================================================
 //        Value Parse
@@ -219,13 +275,13 @@ fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 mod test {
     use logos::Lexer;
 
-    use crate::{query::pql::{parse_query, parse_statement, PqlToken}, value::PakValue};
+    use crate::{query::pql::{PqlQuery, PqlStatement, PqlToken}, test::{build_data_base, Person, Pet}, value::PakValue};
 
     #[test]
     fn pql_parse_query() {
         let pql = "(age <= 25 | name = John) & last_name = Doe";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
-        let query = parse_query(&mut lexer);
+        let query = PqlQuery::parse(&mut lexer);
         println!("Query {query:?}")
     }
     
@@ -233,9 +289,17 @@ mod test {
     fn pql_parse_statement() {
         let pql = "age <= 25";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
-        let stmt = parse_statement(&mut lexer).unwrap();
+        let stmt = PqlStatement::parse(&mut lexer).unwrap();
         assert_eq!(stmt.key, "age");
         assert_eq!(stmt.op, PqlToken::LessEq);
         assert_eq!(stmt.value, PakValue::Int(25));
+    }
+    
+    #[test]
+    fn pql_query_database() {
+        let (pak, _, _) = build_data_base();
+        let pql = "last_name = Doe & (age <= 20 | age >= 25)";
+        let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
+        println!("Results for `{pql}`:\nPeople {people:#?}\nPets {pets:#?}")
     }
 }

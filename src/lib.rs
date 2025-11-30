@@ -9,7 +9,7 @@ use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
 
-use crate::error::PakResult;
+use crate::{error::PakResult, query::pql::pql};
 
 #[cfg(test)]
 mod test;
@@ -58,6 +58,12 @@ impl Pak {
     pub fn query<T>(&self, query : impl PakQueryExpression) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
         let pointers = query.execute(self)?.into_iter().collect();
         T::deserialize_group(self, pointers)
+    }
+    
+    /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
+    pub fn query_sql<T>(&self, pql : &str) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
+        let query = crate::query::pql::pql(pql)?;
+        self.query::<T>(query)
     }
     
     /// Returns the size of the pak file in bytes.

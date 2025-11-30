@@ -1,7 +1,7 @@
 use logos::Lexer;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::{self, pql::PqlToken, query_from_pql}, value::{IntoPakValue, PakValue}, Pak, PakBuilder};
+use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::{self, pql::PqlToken}, value::{IntoPakValue, PakValue}, Pak, PakBuilder};
 
 //==============================================================================================
 //        Personallity Traits
@@ -34,7 +34,7 @@ impl IntoPakValue for PersonalityTrait {
 //==============================================================================================
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-struct Person {
+pub struct Person {
     first_name: String,
     last_name: String,
     age: u32,
@@ -57,7 +57,7 @@ impl PakItemSearchable for Person {
 //==============================================================================================
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-struct Pet {
+pub struct Pet {
     name : String,
     age: u32,
     owner: PakPointer,

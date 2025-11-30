@@ -53,16 +53,6 @@ impl <T> PakQueryExpression for Arc<T> where T : PakQueryExpression {
 }
 
 //==============================================================================================
-//        Query From String
-//==============================================================================================
-
-pub fn query_from_pql(pql : &str) -> Box<dyn PakQueryExpression> {
-    
-    
-    todo!()
-}
-
-//==============================================================================================
 //        PakQueryUnion
 //==============================================================================================
 
@@ -75,6 +65,12 @@ impl PakQueryExpression for PakQueryUnion {
         let results = results_a.into_iter().chain(results_b.into_iter()).collect::<OrderSet<_>>();
         Ok(results)
     }
+}
+
+impl PakQueryUnion {
+    pub fn new(first : impl PakQueryExpression + 'static, second : impl PakQueryExpression + 'static) -> Self {
+        PakQueryUnion(Box::new(first), Box::new(second))
+    } 
 }
 
 impl<B> BitOr<B> for PakQueryUnion where B : PakQueryExpression + 'static {
@@ -106,6 +102,12 @@ impl <B> BitOr<B> for PakQuery where B : PakQueryExpression + 'static {
 //==============================================================================================
 
 pub struct PakQueryIntersection(Box::<dyn PakQueryExpression>, Box::<dyn PakQueryExpression>);
+
+impl PakQueryIntersection {
+    pub fn new(first : impl PakQueryExpression + 'static, second : impl PakQueryExpression + 'static) -> Self {
+        PakQueryIntersection(Box::new(first), Box::new(second))
+    } 
+}
 
 impl PakQueryExpression for PakQueryIntersection {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
