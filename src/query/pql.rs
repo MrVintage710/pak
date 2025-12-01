@@ -77,7 +77,7 @@ fn float(lex : &mut Lexer<PqlToken>) -> Option<f64> {
 pub fn pql(source : &str) -> PakResult<Box<dyn PakQueryExpression>> {
     let mut lexer = Lexer::new(source).peekable();
     match PqlQuery::parse(&mut lexer) {
-        Ok(query) => Ok(query.eval()),
+        Ok(query) => {println!("{query:?}"); Ok(query.eval())},
         Err(error) => Err(error.into()),
     }
 }
@@ -174,8 +174,8 @@ impl PqlExpression {
         if let Some((op, second)) = self.second {
             let second = second.eval();
             match op {
-                PqlToken::And => Box::new(PakQueryUnion::new(first, second)),
-                PqlToken::Or => Box::new(PakQueryIntersection::new(first, second)),
+                PqlToken::And => Box::new(PakQueryIntersection::new(first, second)),
+                PqlToken::Or => Box::new(PakQueryUnion::new(first, second)),
                 _ => unreachable!()
             }
         } else {
@@ -198,9 +198,13 @@ struct PqlStatement {
 
 impl PqlStatement {
     fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlStatement> {
+        println!("First");
         let key = parse_text(lexer)?;
+        println!("Second");
         let op = parse_statement_op(lexer)?;
+        println!("Third");
         let value = parse_value(lexer)?;
+        println!("{key} {op:?} {value:?}");
         Ok(PqlStatement { key, op, value })
     }
     
@@ -275,14 +279,13 @@ fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 mod test {
     use logos::Lexer;
 
-    use crate::{query::pql::{PqlQuery, PqlStatement, PqlToken}, test::{build_data_base, Person, Pet}, value::PakValue};
+    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlQuery, PqlStatement, PqlToken}, test::{build_data_base, Person, Pet}, value::PakValue};
 
     #[test]
     fn pql_parse_query() {
         let pql = "(age <= 25 | name = John) & last_name = Doe";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
         let query = PqlQuery::parse(&mut lexer);
-        println!("Query {query:?}")
     }
     
     #[test]
@@ -296,10 +299,20 @@ mod test {
     }
     
     #[test]
+    fn pql_parse_expression() {
+        let pql = "age <= 20";
+        let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
+        let expr = PqlExpression::parse(&mut lexer).unwrap();
+        println!("{expr:?}")
+    }
+    
+    #[test]
     fn pql_query_database() {
         let (pak, _, _) = build_data_base();
-        let pql = "last_name = Doe & (age <= 20 | age >= 25)";
+        let pql = "age <= 20 | age >= 25";
         let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
-        println!("Results for `{pql}`:\nPeople {people:#?}\nPets {pets:#?}")
+        let (other_people, other_pets) = pak.query::<(Person, Pet)>("age".less_than_or_equal(20) | "age".greater_than_or_equal(25)).unwrap();
+        println!("Results for `{pql}`:\nPeople {people:#?}\nPets {pets:#?}");
+        println!("Other Results:\nPeople {other_people:#?}\nPets {other_pets:#?}");
     }
 }

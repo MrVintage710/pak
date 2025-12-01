@@ -243,8 +243,6 @@ fn pak_query_contains() {
     let query = "personality_traits".contains_value(PersonalityTrait::Creative);
     let people = pak.query::<(Person,)>(query).unwrap();
     
-    println!("{people:?}");
-    
     assert_eq!(people.len(), 3);
 }
 
@@ -275,15 +273,12 @@ fn pql_tokenize() {
     let pql = "age > 25 & (first_name3 = John | first_name = Jane)";
     let lexer = Lexer::<PqlToken>::new(pql);
     let tokens = lexer.into_iter().collect::<Vec<_>>();
-    println!("{tokens:?}")
 }
 
 #[test]
 fn pql_query() {
     let (pak, _, _) = build_data_base();
     let pql = "(age > 25 & first_name = John) | first_name = Jane";
-   
-    println!("{:?}", Lexer::<PqlToken>::new(pql).into_iter().collect::<Vec<_>>());
     
     // let query = query_from_pql(pql);
     // let people = pak.query::<(Person, )>(query).unwrap();
