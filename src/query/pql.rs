@@ -3,7 +3,7 @@ use std::iter::Peekable;
 
 use logos::{Lexer, Logos};
 
-use crate::{error::{PakError, PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryExpression, PakQueryIntersection, PakQueryUnion}, value::PakValue};
+use crate::{error::{PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryExpression, PakQueryIntersection, PakQueryUnion}, value::PakValue};
 
 //==============================================================================================
 //        PQL Tokens
@@ -34,7 +34,7 @@ pub(crate) enum PqlToken {
     GroupStart,
     #[token(")")]
     GroupEnd,
-    #[regex("[a-zA-Z_][a-zA-Z0-9_-]+", text)]
+    #[regex("[a-zA-Z_]([a-zA-Z0-9_-]+)?", text)]
     Text(String),
     #[regex("[0-9]+", int)]
     #[regex("[0-9]+i", int)]
@@ -93,6 +93,11 @@ fn next_is<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>, token : &P
     Ok(token == t)
 }
 
+fn next_is_or_end<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>, token : &PqlToken) -> PqlResult<bool> {
+    let Some(Ok(t)) = lexer.peek() else { return Ok(false) };
+    Ok(token == t)
+}
+
 //==============================================================================================
 //        Query
 //==============================================================================================
@@ -136,7 +141,7 @@ struct PqlGroup(PqlQuery);
 
 impl PqlGroup {
     fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlGroup> {
-        if !next_is(lexer, &PqlToken::GroupStart)? { return Err(PqlError::NoMatch) } 
+        if !next_is_or_end(lexer, &PqlToken::GroupStart)? { return Err(PqlError::NoMatch) }
         lexer.next();
         let query = PqlQuery::parse(lexer)?;
         if !next_is(lexer, &PqlToken::GroupEnd)? { return Err(PqlError::UnexpectedToken(lexer.next().unwrap().unwrap(), ")".to_string())) }
@@ -163,7 +168,7 @@ struct PqlExpression {
 impl PqlExpression {
     fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlExpression> {
         let first = PqlStatement::parse(lexer)?;
-        if !(next_is(lexer, &PqlToken::Or)? || next_is(lexer, &PqlToken::And)?) { return Ok(PqlExpression { first, second: None }) }
+        if !(next_is_or_end(lexer, &PqlToken::Or)? || next_is_or_end(lexer, &PqlToken::And)?) { return Ok(PqlExpression { first, second: None }) }
         let Some(Ok(op)) = lexer.next() else { return Ok(PqlExpression { first, second: None })};
         let second = PqlQuery::parse(lexer)?;
         Ok(PqlExpression { first, second : Some((op, second)) })
@@ -198,13 +203,9 @@ struct PqlStatement {
 
 impl PqlStatement {
     fn parse<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<PqlStatement> {
-        println!("First");
         let key = parse_text(lexer)?;
-        println!("Second");
         let op = parse_statement_op(lexer)?;
-        println!("Third");
         let value = parse_value(lexer)?;
-        println!("{key} {op:?} {value:?}");
         Ok(PqlStatement { key, op, value })
     }
     
@@ -240,6 +241,7 @@ fn parse_value<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> Pql
 }
 
 fn check_value<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<bool> {
+    println!("{:?}", lexer.peek());
     let Some(Ok(next)) = lexer.peek() else { return Err(PqlError::EndOfFile) };
     Ok(matches!(next, PqlToken::Text(_) | PqlToken::Float(_) | PqlToken::Int(_) | PqlToken::Uint(_)))
 }
@@ -300,7 +302,7 @@ mod test {
     
     #[test]
     fn pql_parse_expression() {
-        let pql = "age <= 20";
+        let pql = "age <= 20 | name >= J";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
         let expr = PqlExpression::parse(&mut lexer).unwrap();
         println!("{expr:?}")
@@ -309,9 +311,9 @@ mod test {
     #[test]
     fn pql_query_database() {
         let (pak, _, _) = build_data_base();
-        let pql = "age <= 20 | age >= 25";
+        let pql = "first_name = John & age <= 25";
         let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
-        let (other_people, other_pets) = pak.query::<(Person, Pet)>("age".less_than_or_equal(20) | "age".greater_than_or_equal(25)).unwrap();
+        let (other_people, other_pets) = pak.query::<(Person, Pet)>("first_name".equals("John") & "age".greater_than_or_equal(25)).unwrap();
         println!("Results for `{pql}`:\nPeople {people:#?}\nPets {pets:#?}");
         println!("Other Results:\nPeople {other_people:#?}\nPets {other_pets:#?}");
     }
