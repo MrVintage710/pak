@@ -77,7 +77,7 @@ fn float(lex : &mut Lexer<PqlToken>) -> Option<f64> {
 pub fn pql(source : &str) -> PakResult<Box<dyn PakQueryExpression>> {
     let mut lexer = Lexer::new(source).peekable();
     match PqlQuery::parse(&mut lexer) {
-        Ok(query) => {println!("{query:?}"); Ok(query.eval())},
+        Ok(query) => {Ok(query.eval())},
         Err(error) => Err(error.into()),
     }
 }
@@ -241,7 +241,6 @@ fn parse_value<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> Pql
 }
 
 fn check_value<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<bool> {
-    println!("{:?}", lexer.peek());
     let Some(Ok(next)) = lexer.peek() else { return Err(PqlError::EndOfFile) };
     Ok(matches!(next, PqlToken::Text(_) | PqlToken::Float(_) | PqlToken::Int(_) | PqlToken::Uint(_)))
 }
