@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::{HashMap, VecDeque}, fmt::Debug};
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, pointer::{PakPointer, PakUntypedPointer}};
+use crate::{error::{PakError, PakResult}, pointer::{PakPointer, PakUntypedPointer}};
 
 use super::{value::PakValue, Pak, PakBuilder};
 
@@ -19,7 +19,7 @@ pub struct PakTree<'p> {
 impl <'p> PakTree<'p> {
     pub fn new(pak: &'p Pak, key : &str) -> PakResult<PakTree<'p>> {
         let indices = pak.fetch_indices()?;
-        let pointer = indices.get(key).unwrap();
+        let Some(pointer) = indices.get(key) else { return Err(PakError::InvalidIndex(key.to_string())) };
         let meta : PakTreeMeta = pak.read_err::<PakTreeMeta>(&pointer.as_pointer())?;
         
         Ok(PakTree {

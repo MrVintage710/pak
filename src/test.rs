@@ -35,10 +35,10 @@ impl IntoPakValue for PersonalityTrait {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Person {
-    first_name: String,
-    last_name: String,
-    age: u32,
-    personallity_traits : Vec<PersonalityTrait>
+    pub first_name: String,
+    pub last_name: String,
+    pub age: u32,
+    pub personallity_traits : Vec<PersonalityTrait>
 }
 
 impl PakItemSearchable for Person {
@@ -47,7 +47,7 @@ impl PakItemSearchable for Person {
         indices.push(PakIndex::new("first_name", self.first_name.clone()));
         indices.push(PakIndex::new("last_name", self.last_name.clone()));
         indices.push(PakIndex::new("age", self.age));
-        indices.push(PakIndex::new("personality_traits", self.personallity_traits.clone()));
+        indices.push(PakIndex::new("personallity_traits", self.personallity_traits.clone()));
         indices
     }
 }
@@ -58,10 +58,10 @@ impl PakItemSearchable for Person {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Pet {
-    name : String,
-    age: u32,
-    owner: PakPointer,
-    kind: PetKind,
+    pub name : String,
+    pub age: u32,
+    pub owner: PakPointer,
+    pub kind: PetKind,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

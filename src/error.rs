@@ -17,7 +17,9 @@ pub enum PakError {
     #[error("There was an error packing the module: {0}")]
     FileError(#[from] std::io::Error),
     #[error("PQL Error")]
-    PqlError(#[from] PqlError)
+    PqlError(#[from] PqlError),
+    #[error("Unable to find index `{0}` in Pak. Make sure that this index is correctly spelled.")]
+    InvalidIndex(String)
 }
 
 pub type PqlResult<T> = Result<T, PqlError>;

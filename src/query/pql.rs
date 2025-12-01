@@ -9,7 +9,7 @@ use crate::{error::{PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryE
 //        PQL Tokens
 //==============================================================================================
 
-#[derive(Logos, Debug, PartialEq, PartialOrd)]
+#[derive(Logos, Debug, PartialEq, PartialOrd, Clone)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
 pub enum PqlToken {
     #[token("=")]
@@ -22,6 +22,8 @@ pub enum PqlToken {
     Greater,
     #[token(">=")]
     GreaterEq,
+    #[token("<-")]
+    Contains,
     #[token("|")]
     Or,
     #[token("&")]
@@ -102,7 +104,7 @@ fn next_is_or_end<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>, tok
 //        Query
 //==============================================================================================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum PqlQuery {
     Expression(Box<PqlExpression>),
     Group(Box<PqlGroup>)
@@ -136,7 +138,7 @@ impl PqlQuery {
 //        PqlGroup
 //==============================================================================================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PqlGroup(PqlQuery);
 
 impl PqlGroup {
@@ -159,7 +161,7 @@ impl PqlGroup {
 //        Expression
 //==============================================================================================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PqlExpression {
     first : PqlStatement,
     second : Option<(PqlToken, PqlQuery)>
@@ -194,7 +196,7 @@ impl PqlExpression {
 //        Statement
 //==============================================================================================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PqlStatement {
     key : String,
     op : PqlToken,
@@ -216,6 +218,7 @@ impl PqlStatement {
             PqlToken::LessEq => PakQuery::LessThanEqual(self.key, self.value),
             PqlToken::Greater => PakQuery::GreaterThan(self.key, self.value),
             PqlToken::GreaterEq => PakQuery::GreaterThanEqual(self.key, self.value),
+            PqlToken::Contains => PakQuery::Contains(self.key, self.value),
             _ => unreachable!()
         };
         Box::new(query)
@@ -272,7 +275,7 @@ fn parse_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 
 fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>) -> PqlResult<bool> {
     let Some(Ok(next)) = lexer.peek() else { return Err(PqlError::EndOfFile) };
-    Ok(matches!(next, PqlToken::Eq | PqlToken::Less | PqlToken::Greater | PqlToken::LessEq | PqlToken::GreaterEq))
+    Ok(matches!(next, PqlToken::Eq | PqlToken::Less | PqlToken::Greater | PqlToken::LessEq | PqlToken::GreaterEq | PqlToken::Contains))
 }
 
 
@@ -280,13 +283,14 @@ fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 mod test {
     use logos::Lexer;
 
-    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlQuery, PqlStatement, PqlToken}, test::{build_data_base, Person, Pet}, value::PakValue};
+    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlGroup, PqlQuery, PqlStatement, PqlToken}, test::{Person, Pet, build_data_base}, value::PakValue};
 
     #[test]
     fn pql_parse_query() {
-        let pql = "(age <= 25 | name = John) & last_name = Doe";
+        let pql = "(age >= 25 | name = John) & last_name = Doe & personallity_traits <- Patient";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
         let query = PqlQuery::parse(&mut lexer);
+        assert!(query.is_ok())
     }
     
     #[test]
@@ -304,16 +308,28 @@ mod test {
         let pql = "age <= 20 | name >= J";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
         let expr = PqlExpression::parse(&mut lexer).unwrap();
-        println!("{expr:?}")
+        assert_eq!(expr.first.key, "age");
+        assert_eq!(expr.first.op, PqlToken::LessEq);
+        assert_eq!(expr.first.value, PakValue::Int(20));
     }
     
     #[test]
-    fn pql_query_database() {
+    fn pql_parse_group() {
+        let pql = "(age <= 20 | name >= J)";
+        let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
+        let expr = PqlGroup::parse(&mut lexer).unwrap();
+        assert!(matches!(expr, PqlGroup(PqlQuery::Expression(_))));
+    }
+    
+    #[test]
+    fn pql_compare() {
         let (pak, _, _) = build_data_base();
-        let pql = "first_name = John & age <= 25";
-        let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
-        let (other_people, other_pets) = pak.query::<(Person, Pet)>("first_name".equals("John") & "age".greater_than_or_equal(25)).unwrap();
-        println!("Results for `{pql}`:\nPeople {people:#?}\nPets {pets:#?}");
-        println!("Other Results:\nPeople {other_people:#?}\nPets {other_pets:#?}");
+        let pql = "personallity_traits <- Patient";
+        let query = "personallity_traits".contains_value("Patient");
+        let people = pak.query_sql::<(Person,)>(pql).unwrap();
+        let other_people = pak.query::<(Person,)>(query).unwrap();
+        assert_eq!(people.len(), other_people.len());
+        assert!(people.iter().all(|person| person.personallity_traits.contains(&crate::test::PersonalityTrait::Patient)));
+        assert!(other_people.iter().all(|person| person.personallity_traits.contains(&crate::test::PersonalityTrait::Patient)));
     }
 }
