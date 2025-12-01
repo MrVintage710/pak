@@ -283,7 +283,7 @@ fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 mod test {
     use logos::Lexer;
 
-    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlGroup, PqlQuery, PqlStatement, PqlToken}, test::{Person, Pet, build_data_base}, value::PakValue};
+    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlGroup, PqlQuery, PqlStatement, PqlToken}, test::{Person, build_data_base}, value::PakValue};
 
     #[test]
     fn pql_parse_query() {
