@@ -267,19 +267,3 @@ fn compound_intersection_query() {
     assert_eq!(people.len(), 2);
     assert_eq!(pets.len(), 0);
 }
-
-#[test]
-fn pql_tokenize() {
-    let pql = "age > 25 & (first_name3 = John | first_name = Jane)";
-    let lexer = Lexer::<PqlToken>::new(pql);
-    let tokens = lexer.into_iter().collect::<Vec<_>>();
-}
-
-#[test]
-fn pql_query() {
-    let (pak, _, _) = build_data_base();
-    let pql = "(age > 25 & first_name = John) | first_name = Jane";
-    
-    // let query = query_from_pql(pql);
-    // let people = pak.query::<(Person, )>(query).unwrap();
-}

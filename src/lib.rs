@@ -9,7 +9,7 @@ use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
 
-use crate::{error::PakResult, query::pql::pql};
+use crate::error::PakResult;
 
 #[cfg(test)]
 mod test;
@@ -106,7 +106,7 @@ impl Pak {
         }
     }
     
-    pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree> {
+    pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree<'_>> {
         PakTree::new(self, key)
     }
     

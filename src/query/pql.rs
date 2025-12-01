@@ -11,7 +11,7 @@ use crate::{error::{PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryE
 
 #[derive(Logos, Debug, PartialEq, PartialOrd)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
-pub(crate) enum PqlToken {
+pub enum PqlToken {
     #[token("=")]
     Eq,
     #[token("<")]
