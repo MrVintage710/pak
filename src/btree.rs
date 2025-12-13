@@ -156,14 +156,13 @@ impl <'p> PakTree<'p> {
     
     fn get_contains_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>) -> PakResult<()> {
         let page : PakTreePage = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
-        
         for entry in page.values {
             if entry.key.contains(value) {
                 entry.values.clone().into_iter().for_each(|value| {set.insert(value);});
-                if let Some(index) = entry.previous {
-                    let pointer = self.meta.pages.get(&index).unwrap();
-                    self.get_contains_r(value, *pointer, set)?;
-                }
+            }
+            if let Some(index) = entry.previous {
+                let pointer = self.meta.pages.get(&index).unwrap();
+                self.get_contains_r(value, *pointer, set)?;
             }
         }
         
