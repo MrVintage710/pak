@@ -146,13 +146,16 @@ impl <B> BitAnd<B> for PakQueryIntersection where B : PakQueryExpression + 'stat
 //        Pak Query Expression
 //==============================================================================================
 
+#[derive(Default)]
 pub enum PakQuery {
     Equal(String, PakValue),
     GreaterThan(String, PakValue),
     LessThan(String, PakValue),
     GreaterThanEqual(String, PakValue),
     LessThanEqual(String, PakValue),
-    Contains(String, PakValue)
+    Contains(String, PakValue),
+    #[default]
+    All
 }
 
 impl PakQuery {
@@ -227,6 +230,10 @@ impl PakQueryExpression for PakQuery {
             PakQuery::Contains(key, pak_value) => {
                 let tree = pak.get_tree(key)?;
                 tree.get_contains(pak_value)
+            },
+            PakQuery::All => {
+                let list = pak.fetch_list()?;
+                Ok(list.into_iter().collect::<OrderSet<_>>())
             }
         }
     }

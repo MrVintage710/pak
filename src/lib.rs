@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png")]
 
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path};
+use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor, Read, Seek, SeekFrom}, path::Path, sync::{RwLock}};
 use btree::{PakTree, PakTreeBuilder};
 use index::PakIndex;
 use item::{PakItemDeserialize, PakItemDeserializeGroup, PakItemSearchable, PakItemSerialize};
@@ -22,6 +22,7 @@ pub(crate) mod btree;
 pub mod query;
 pub mod error;
 pub mod pointer;
+pub mod builder;
 
 //==============================================================================================
 //        Pak File
@@ -31,12 +32,12 @@ pub mod pointer;
 pub struct Pak {
     sizing : PakSizing,
     meta : PakMeta,
-    source : RefCell<Box<dyn PakSource>>
+    source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>
 }
 
 impl Pak {
     /// Creates a new Pak instance from a [PakSource](crate::PakSource).
-    pub fn new<S>(mut source : S) -> PakResult<Self> where S : PakSource + 'static {
+    pub fn new<S>(mut source : S) -> PakResult<Self> where S : PakSource + Send + Sync + 'static {
         let sizing_pointer = PakPointer::new_untyped(0, 24);
         let sizing_buffer = source.read(&sizing_pointer, 0)?;
         let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
@@ -45,7 +46,7 @@ impl Pak {
         let meta_buffer = source.read(&meta_pointer, 0)?;
         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
 
-        Ok(Self { sizing, source : RefCell::new(Box::new(source)), meta })
+        Ok(Self { sizing, source : RwLock::new(Box::new(source)), meta })
     }
     
     /// Loads a Pak from the specified file path. This will not load the entire pak file into memory, just the header.
@@ -93,7 +94,8 @@ impl Pak {
     
     pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemDeserialize {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
-        let buffer = self.source.borrow_mut().read(pointer, self.get_vault_start())?;
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse)};
+        let buffer = source.read(pointer, self.get_vault_start())?;
         let res = T::from_bytes(&buffer)?;
         Ok(res)
     }
@@ -112,20 +114,32 @@ impl Pak {
     
     pub(crate) fn fetch_indices(&self) -> PakResult<HashMap<String, PakUntypedPointer>> {
         let pointer = PakPointer::new_untyped(self.get_indices_start(), self.sizing.indices_size);
-        let buffer = self.source.borrow_mut().read(&pointer, 0)?;
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
+        let buffer = source.read(&pointer, 0)?;
         let indices = bincode::deserialize(&buffer)?;
         Ok(indices)
     }
     
+    pub(crate) fn fetch_list(&self) -> PakResult<Vec<PakPointer>> {
+        let pointer = PakPointer::new_untyped(self.get_list_start(), self.sizing.list_size);
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
+        let buffer = source.read(&pointer, 0)?;
+        let list = bincode::deserialize(&buffer)?;
+        Ok(list)
+    }
+    
     pub(crate) fn get_vault_start(&self) -> u64 {
         // To be honest, I'm not sure why this start is offset by 8, it just is and I am to scared to ask.
-        24 + self.sizing.meta_size + self.sizing.indices_size + 8
+        self.get_list_start() + self.sizing.list_size + 8
+    }
+    
+    pub(crate) fn get_list_start(&self) -> u64 {
+        self.get_indices_start() + self.sizing.indices_size
     }
     
     pub(crate) fn get_indices_start(&self) -> u64 {
-        24 + self.sizing.meta_size
+        32 + self.sizing.meta_size
     }
-    
 }
 
 //==============================================================================================
@@ -246,7 +260,7 @@ impl PakBuilder {
         let pak  = Pak {
             sizing,
             meta,
-            source: RefCell::new(Box::new(BufReader::new(File::open(path)?))),
+            source: RwLock::new(Box::new(BufReader::new(File::open(path)?))),
         };
         Ok(pak)
     }
@@ -258,21 +272,23 @@ impl PakBuilder {
         let pak = Pak {
             sizing,
             meta,
-            source: RefCell::new(Box::new(Cursor::new(out))),
+            source: RwLock::new(Box::new(Cursor::new(out))),
         };
         Ok(pak)
     }
     
     fn build_internal(mut self)  -> PakResult<(Vec<u8>, PakSizing, PakMeta)> {
         let mut map : HashMap<String, PakTreeBuilder> = HashMap::new();
+        let mut list : Vec<PakPointer> = Vec::new();
         for chunk in &self.chunks {
             for index in &chunk.indices{
                 map.entry(index.key.clone())
-                    .or_insert(PakTreeBuilder::new(6))
+                    .or_insert(PakTreeBuilder::new(16))
                     .access()
                     .insert(index.value.clone(), chunk.pointer.clone())
                 ;
             }
+            list.push(chunk.pointer.clone());
         }
         
         let mut pointer_map : HashMap<String, PakUntypedPointer> = HashMap::new();
@@ -292,17 +308,20 @@ impl PakBuilder {
             meta_size: bincode::serialized_size(&meta)?,
             indices_size: bincode::serialized_size(&pointer_map)?,
             vault_size: bincode::serialized_size(&self.vault)?,
+            list_size: bincode::serialized_size(&list)?,
         };
         
         let mut sizing_out = bincode::serialize(&sizing)?;
         let mut meta_out = bincode::serialize(&meta)?;
         let mut pointer_map_out = bincode::serialize(&pointer_map)?;
         let mut vault_out = bincode::serialize(&self.vault)?;
+        let mut list_out = bincode::serialize(&list)?;
         
         let mut out = Vec::<u8>::new();
         out.append(&mut sizing_out);
         out.append(&mut meta_out);
         out.append(&mut pointer_map_out);
+        out.append(&mut list_out);
         out.append(&mut vault_out);
         Ok((out, sizing, meta))
     }

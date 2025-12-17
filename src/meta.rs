@@ -15,4 +15,5 @@ pub struct PakSizing {
     pub meta_size: u64,
     pub indices_size: u64,
     pub vault_size: u64,
+    pub list_size: u64,
 }
