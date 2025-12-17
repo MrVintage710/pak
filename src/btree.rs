@@ -2,9 +2,9 @@ use std::{cmp::Ordering, collections::{HashMap, VecDeque}, fmt::Debug};
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::{PakError, PakResult}, pointer::{PakPointer, PakUntypedPointer}};
+use crate::{builder::PakBuilder, error::{PakError, PakResult}, pointer::{PakPointer, PakUntypedPointer}};
 
-use super::{value::PakValue, Pak, PakBuilder};
+use super::{value::PakValue, Pak};
 
 
 //==============================================================================================
