@@ -271,7 +271,7 @@ fn pak_query_all() {
     let (pak, _, _) = build_data_base();
     
     let query = PakQuery::All;
-    let (people, pets) = pak.query::<(Person, Pet)>(query).unwrap();
+    let (pets, people) = pak.query::<(Pet, Person)>(query).unwrap();
     
     assert_eq!(people.len(), 7);
     assert_eq!(pets.len(), 3);

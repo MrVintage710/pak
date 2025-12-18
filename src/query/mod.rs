@@ -2,51 +2,51 @@
 
 pub mod pql;
 
-use std::{ops::{BitAnd, BitOr}, rc::Rc, sync::Arc};
+use std::{marker::PhantomData, ops::{BitAnd, BitOr}, rc::Rc, sync::Arc};
 use ordermap::OrderSet;
 
-use crate::{error::PakResult, pointer::PakPointer};
+use crate::{error::PakResult, item::PakItemDeserializeGroup, pointer::PakPointer};
 use super::{value::PakValue, Pak};
 
 //==============================================================================================
 //        Pak Query
 //==============================================================================================
 
-pub trait PakQueryExpression {
+pub trait PakQueryExpression<T> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>>;
 }
 
-impl PakQueryExpression for Box<dyn PakQueryExpression> {
+impl <T> PakQueryExpression<T> for Box<dyn PakQueryExpression<T>> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         self.as_ref().execute(pak)
     }
 }
 
-impl PakQueryExpression for Rc<dyn PakQueryExpression> {
+impl <T> PakQueryExpression<T> for Rc<dyn PakQueryExpression<T>> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         Rc::as_ref(&self).execute(pak)
     }
 }
 
-impl PakQueryExpression for Arc<dyn PakQueryExpression> {
+impl <T> PakQueryExpression<T> for Arc<dyn PakQueryExpression<T>> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         Arc::as_ref(&self).execute(pak)
     }
 }
 
-impl <T> PakQueryExpression for Box<T> where T : PakQueryExpression {
+impl <T, Q> PakQueryExpression<T> for Box<Q> where T : PakItemDeserializeGroup, Q : PakQueryExpression<T> {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         self.as_ref().execute(pak)
     }
 }
 
-impl <T> PakQueryExpression for Rc<T> where T : PakQueryExpression  {
+impl <T, Q> PakQueryExpression<T> for Rc<Q> where T : PakItemDeserializeGroup, Q : PakQueryExpression<T>  {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         Rc::as_ref(&self).execute(pak)
     }
 }
 
-impl <T> PakQueryExpression for Arc<T> where T : PakQueryExpression {
+impl <T, Q> PakQueryExpression<T> for Arc<Q> where T : PakItemDeserializeGroup, Q : PakQueryExpression<T> {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         Arc::as_ref(&self).execute(pak)
     }
@@ -56,9 +56,9 @@ impl <T> PakQueryExpression for Arc<T> where T : PakQueryExpression {
 //        PakQueryUnion
 //==============================================================================================
 
-pub struct PakQueryUnion(Box<dyn PakQueryExpression>, Box<dyn PakQueryExpression>);
+pub struct PakQueryUnion<T>(Box<dyn PakQueryExpression<T>>, Box<dyn PakQueryExpression<T>>) where T : PakItemDeserializeGroup;
 
-impl PakQueryExpression for PakQueryUnion {
+impl <T> PakQueryExpression<T> for PakQueryUnion<T> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
@@ -67,13 +67,13 @@ impl PakQueryExpression for PakQueryUnion {
     }
 }
 
-impl PakQueryUnion {
-    pub fn new(first : impl PakQueryExpression + 'static, second : impl PakQueryExpression + 'static) -> Self {
+impl <T> PakQueryUnion<T> where T : PakItemDeserializeGroup {
+    pub fn new(first : impl PakQueryExpression<T> + 'static, second : impl PakQueryExpression<T> + 'static) -> Self {
         PakQueryUnion(Box::new(first), Box::new(second))
     } 
 }
 
-impl<B> BitOr<B> for PakQueryUnion where B : PakQueryExpression + 'static {
+impl <T, B> BitOr<B> for PakQueryUnion<T> where T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
     type Output = Self;
 
     fn bitor(self, other: B) -> Self::Output {
@@ -81,16 +81,16 @@ impl<B> BitOr<B> for PakQueryUnion where B : PakQueryExpression + 'static {
     }
 }
 
-impl <B> BitOr<B> for PakQueryIntersection where B : PakQueryExpression + 'static {
-    type Output = PakQueryUnion;
+impl <T, B> BitOr<B> for PakQueryIntersection<T> where T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
+    type Output = PakQueryUnion<T>;
 
     fn bitor(self, other: B) -> Self::Output {
         PakQueryUnion(Box::new(self), Box::new(other))
     }
 }
 
-impl <B> BitOr<B> for PakQuery where B : PakQueryExpression + 'static {
-    type Output = PakQueryUnion;
+impl <T, B> BitOr<B> for PakQuery<T> where T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
+    type Output = PakQueryUnion<T>;
 
     fn bitor(self, other: B) -> Self::Output {
         PakQueryUnion(Box::new(self), Box::new(other))
@@ -101,15 +101,15 @@ impl <B> BitOr<B> for PakQuery where B : PakQueryExpression + 'static {
 //        Pak Query Intersection
 //==============================================================================================
 
-pub struct PakQueryIntersection(Box::<dyn PakQueryExpression>, Box::<dyn PakQueryExpression>);
+pub struct PakQueryIntersection<T>(Box::<dyn PakQueryExpression<T>>, Box::<dyn PakQueryExpression<T>>) where T : PakItemDeserializeGroup;
 
-impl PakQueryIntersection {
-    pub fn new(first : impl PakQueryExpression + 'static, second : impl PakQueryExpression + 'static) -> Self {
+impl <T> PakQueryIntersection<T> where T : PakItemDeserializeGroup {
+    pub fn new(first : impl PakQueryExpression<T> + 'static, second : impl PakQueryExpression<T> + 'static) -> Self {
         PakQueryIntersection(Box::new(first), Box::new(second))
     } 
 }
 
-impl PakQueryExpression for PakQueryIntersection {
+impl <T> PakQueryExpression<T> for PakQueryIntersection<T> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         let results_a = self.0.execute(pak)?;
         let results_b = self.1.execute(pak)?;
@@ -117,24 +117,24 @@ impl PakQueryExpression for PakQueryIntersection {
     }
 }
 
-impl <B> BitAnd<B> for PakQuery where B : PakQueryExpression + 'static {
-    type Output = PakQueryIntersection;
+impl <T, B> BitAnd<B> for PakQuery<T> where  T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
+    type Output = PakQueryIntersection<T>;
 
     fn bitand(self, rhs: B) -> Self::Output {
         PakQueryIntersection(Box::new(self), Box::new(rhs))
     }
 }
 
-impl <B> BitAnd<B> for PakQueryUnion where B : PakQueryExpression + 'static {
-    type Output = PakQueryIntersection;
+impl <T, B> BitAnd<B> for PakQueryUnion<T> where T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
+    type Output = PakQueryIntersection<T>;
 
     fn bitand(self, rhs: B) -> Self::Output {
         PakQueryIntersection(Box::new(self), Box::new(rhs))
     }
 }
 
-impl <B> BitAnd<B> for PakQueryIntersection where B : PakQueryExpression + 'static {
-    type Output = PakQueryIntersection;
+impl <T, B> BitAnd<B> for PakQueryIntersection<T> where T : PakItemDeserializeGroup + 'static, B : PakQueryExpression<T> + 'static {
+    type Output = PakQueryIntersection<T>;
 
     fn bitand(self, rhs: B) -> Self::Output {
         PakQueryIntersection(Box::new(self), Box::new(rhs))
@@ -147,8 +147,8 @@ impl <B> BitAnd<B> for PakQueryIntersection where B : PakQueryExpression + 'stat
 //==============================================================================================
 
 #[derive(Default)]
-pub enum PakQuery {
-    Equal(String, PakValue),
+pub enum PakQuery<T : PakItemDeserializeGroup> {
+    Equal(String, PakValue, PhantomData<T>),
     GreaterThan(String, PakValue),
     LessThan(String, PakValue),
     GreaterThanEqual(String, PakValue),
@@ -158,9 +158,9 @@ pub enum PakQuery {
     All
 }
 
-impl PakQuery {
+impl <T> PakQuery<T> where T : PakItemDeserializeGroup {
     pub fn equals(key : &str, value : impl Into<PakValue>) -> Self {
-        PakQuery::Equal(key.to_string(), value.into())
+        PakQuery::Equal(key.to_string(), value.into(), PhantomData)
     }
 
     pub fn greater_than(key : &str, value : impl Into<PakValue>) -> Self {
@@ -184,30 +184,30 @@ impl PakQuery {
     }
 }
 
-pub fn equals(key : &str, value : impl Into<PakValue>) -> PakQuery {
-    PakQuery::Equal(key.to_string(), value.into())
+pub fn equals<T : PakItemDeserializeGroup>(key : &str, value : impl Into<PakValue>) -> PakQuery<T> {
+    PakQuery::Equal(key.to_string(), value.into(), PhantomData)
 }
 
-pub fn greater_than(key : &str, value : impl Into<PakValue>) -> PakQuery {
+pub fn greater_than<T : PakItemDeserializeGroup>(key : &str, value : impl Into<PakValue>) -> PakQuery<T> {
     PakQuery::GreaterThan(key.to_string(), value.into())
 }
 
-pub fn less_than(key : &str, value : impl Into<PakValue>) -> PakQuery {
+pub fn less_than<T : PakItemDeserializeGroup>(key : &str, value : impl Into<PakValue>) -> PakQuery<T> {
     PakQuery::LessThan(key.to_string(), value.into())
 }
 
-pub fn greater_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
+pub fn greater_than_equal<T : PakItemDeserializeGroup>(key : &str, value : impl Into<PakValue>) -> PakQuery<T> {
     PakQuery::GreaterThanEqual(key.to_string(), value.into())
 }
 
-pub fn less_than_equal(key : &str, value : impl Into<PakValue>) -> PakQuery {
+pub fn less_than_equal<T : PakItemDeserializeGroup>(key : &str, value : impl Into<PakValue>) -> PakQuery<T> {
     PakQuery::LessThanEqual(key.to_string(), value.into())
 }
 
-impl PakQueryExpression for PakQuery {
+impl <T> PakQueryExpression<T> for PakQuery<T> where T : PakItemDeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         match self {
-            PakQuery::Equal(key, pak_value) => {
+            PakQuery::Equal(key, pak_value, _) => {
                 let tree = pak.get_tree(key)?;
                 tree.get(pak_value)
             },
@@ -232,7 +232,7 @@ impl PakQueryExpression for PakQuery {
                 tree.get_contains(pak_value)
             },
             PakQuery::All => {
-                let list = pak.fetch_list()?;
+                let list = pak.fetch_all_pointers_of::<T>()?;
                 Ok(list.into_iter().collect::<OrderSet<_>>())
             }
         }

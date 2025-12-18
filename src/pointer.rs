@@ -1,7 +1,7 @@
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, query::PakQueryExpression};
+use crate::{error::PakResult, item::PakItemDeserializeGroup, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
@@ -64,6 +64,11 @@ impl PakPointer {
             Self::Untyped(_) => true,
         }
     }
+    
+    pub fn drop_type(&mut self) {
+        let pointer = PakPointer::Untyped(PakUntypedPointer { offset: self.offset(), size: self.size() });
+        *self = pointer
+    }
 }
 
 impl Clone for PakPointer {
@@ -75,7 +80,7 @@ impl Clone for PakPointer {
     }
 }
 
-impl PakQueryExpression for PakPointer {
+impl <T> PakQueryExpression<T> for PakPointer where T : PakItemDeserializeGroup {
     fn execute(&self, _pak : &crate::Pak) -> PakResult<OrderSet<PakPointer>> {
         Ok(OrderSet::from([self.clone()]))
     }

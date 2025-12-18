@@ -46,6 +46,8 @@ pub trait PakItemDeserializeGroup {
     type ReturnType;
     
     fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType>;
+    
+    fn get_types() -> Vec<&'static str>;
 }
 
 impl <T> PakItemDeserializeGroup for (T, ) where T : PakItemDeserialize{
@@ -54,6 +56,12 @@ impl <T> PakItemDeserializeGroup for (T, ) where T : PakItemDeserialize{
     fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType> {
         let values = pointers.iter().filter_map(|pointer| pak.read::<T>(pointer)).collect::<Vec<_>>();
         Ok(values)
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T>()
+        ]
     }
 }
 
@@ -64,6 +72,13 @@ impl <T1, T2> PakItemDeserializeGroup for (T1, T2) where T1 : PakItemDeserialize
         let t1 = pointers.iter().filter_map(|pointer| pak.read::<T1>(pointer)).collect::<Vec<_>>();
         let t2 = pointers.iter().filter_map(|pointer| pak.read::<T2>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2));
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+        ]
     }
 }
 
@@ -76,6 +91,14 @@ impl <T1, T2, T3> PakItemDeserializeGroup for (T1, T2, T3) where T1 : PakItemDes
         let t3 = pointers.iter().filter_map(|pointer| pak.read::<T3>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3));
     }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+        ]
+    }
 }
 
 impl <T1, T2, T3, T4> PakItemDeserializeGroup for (T1, T2, T3, T4) where T1 : PakItemDeserialize, T2 : PakItemDeserialize, T3 : PakItemDeserialize, T4 : PakItemDeserialize {
@@ -87,6 +110,15 @@ impl <T1, T2, T3, T4> PakItemDeserializeGroup for (T1, T2, T3, T4) where T1 : Pa
         let t3 = pointers.iter().filter_map(|pointer| pak.read::<T3>(pointer)).collect::<Vec<_>>();
         let t4 = pointers.iter().filter_map(|pointer| pak.read::<T4>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3, t4));
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+            std::any::type_name::<T4>(),
+        ]
     }
 }
 
@@ -101,6 +133,16 @@ impl <T1, T2, T3, T4, T5> PakItemDeserializeGroup for (T1, T2, T3, T4, T5) where
         let t5 = pointers.iter().filter_map(|pointer| pak.read::<T5>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3, t4, t5));
     }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+            std::any::type_name::<T4>(),
+            std::any::type_name::<T5>(),
+        ]
+    }
 }
 
 impl <T1, T2, T3, T4, T5, T6> PakItemDeserializeGroup for (T1, T2, T3, T4, T5, T6) where T1 : PakItemDeserialize, T2 : PakItemDeserialize, T3 : PakItemDeserialize, T4 : PakItemDeserialize, T5 : PakItemDeserialize, T6 : PakItemDeserialize {
@@ -114,6 +156,17 @@ impl <T1, T2, T3, T4, T5, T6> PakItemDeserializeGroup for (T1, T2, T3, T4, T5, T
         let t5 = pointers.iter().filter_map(|pointer| pak.read::<T5>(pointer)).collect::<Vec<_>>();
         let t6 = pointers.iter().filter_map(|pointer| pak.read::<T6>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3, t4, t5, t6));
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+            std::any::type_name::<T4>(),
+            std::any::type_name::<T5>(),
+            std::any::type_name::<T6>(),
+        ]
     }
 }
 
@@ -130,6 +183,18 @@ impl <T1, T2, T3, T4, T5, T6, T7> PakItemDeserializeGroup for (T1, T2, T3, T4, T
         let t7 = pointers.iter().filter_map(|pointer| pak.read::<T7>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3, t4, t5, t6, t7));
     }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+            std::any::type_name::<T4>(),
+            std::any::type_name::<T5>(),
+            std::any::type_name::<T6>(),
+            std::any::type_name::<T7>(),
+        ]
+    }
 }
 
 impl <T1, T2, T3, T4, T5, T6, T7, T8> PakItemDeserializeGroup for (T1, T2, T3, T4, T5, T6, T7, T8) where T1 : PakItemDeserialize, T2 : PakItemDeserialize, T3 : PakItemDeserialize, T4 : PakItemDeserialize, T5 : PakItemDeserialize, T6 : PakItemDeserialize, T7 : PakItemDeserialize, T8 : PakItemDeserialize {
@@ -145,5 +210,18 @@ impl <T1, T2, T3, T4, T5, T6, T7, T8> PakItemDeserializeGroup for (T1, T2, T3, T
         let t7 = pointers.iter().filter_map(|pointer| pak.read::<T7>(pointer)).collect::<Vec<_>>();
         let t8 = pointers.iter().filter_map(|pointer| pak.read::<T8>(pointer)).collect::<Vec<_>>();
         return Ok((t1, t2, t3, t4, t5, t6, t7, t8));
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T1>(),
+            std::any::type_name::<T2>(),
+            std::any::type_name::<T3>(),
+            std::any::type_name::<T4>(),
+            std::any::type_name::<T5>(),
+            std::any::type_name::<T6>(),
+            std::any::type_name::<T7>(),
+            std::any::type_name::<T8>(),
+        ]
     }
 }

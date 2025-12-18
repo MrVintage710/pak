@@ -1,9 +1,9 @@
 
-use std::iter::Peekable;
+use std::{iter::Peekable, marker::PhantomData};
 
 use logos::{Lexer, Logos};
 
-use crate::{error::{PakResult, PqlError, PqlResult}, query::{PakQuery, PakQueryExpression, PakQueryIntersection, PakQueryUnion}, value::PakValue};
+use crate::{error::{PakResult, PqlError, PqlResult}, item::PakItemDeserializeGroup, query::{PakQuery, PakQueryExpression, PakQueryIntersection, PakQueryUnion}, value::PakValue};
 
 //==============================================================================================
 //        PQL Tokens
@@ -76,7 +76,7 @@ fn float(lex : &mut Lexer<PqlToken>) -> Option<f64> {
 //        Parse Function
 //==============================================================================================
 
-pub fn pql(source : &str) -> PakResult<Box<dyn PakQueryExpression>> {
+pub fn pql<T : PakItemDeserializeGroup + 'static>(source : &str) -> PakResult<Box<dyn PakQueryExpression<T>>> {
     let mut lexer = Lexer::new(source).peekable();
     match PqlQuery::parse(&mut lexer) {
         Ok(query) => {Ok(query.eval())},
@@ -125,7 +125,7 @@ impl PqlQuery {
         }
     }
     
-    fn eval(self) -> Box<dyn PakQueryExpression> {
+    fn eval<T : PakItemDeserializeGroup + 'static>(self) -> Box<dyn PakQueryExpression<T>> {
         match self {
             PqlQuery::Expression(pql_expression) => pql_expression.eval(),
             PqlQuery::Group(pql_group) => pql_group.eval(),
@@ -151,7 +151,7 @@ impl PqlGroup {
         Ok(PqlGroup(query))
     }
     
-    fn eval(self) -> Box<dyn PakQueryExpression> {
+    fn eval<T : PakItemDeserializeGroup + 'static>(self) -> Box<dyn PakQueryExpression<T>> {
         self.0.eval()
     }
 }
@@ -176,8 +176,8 @@ impl PqlExpression {
         Ok(PqlExpression { first, second : Some((op, second)) })
     }
     
-    fn eval(self) -> Box<dyn PakQueryExpression> {
-        let first = self.first.eval();
+    fn eval<T : PakItemDeserializeGroup + 'static>(self) -> Box<dyn PakQueryExpression<T>> {
+        let first = self.first.eval::<T>();
         if let Some((op, second)) = self.second {
             let second = second.eval();
             match op {
@@ -211,9 +211,9 @@ impl PqlStatement {
         Ok(PqlStatement { key, op, value })
     }
     
-    fn eval(self) -> Box<dyn PakQueryExpression> {
+    fn eval<T : PakItemDeserializeGroup + 'static>(self) -> Box<dyn PakQueryExpression<T>> {
         let query = match self.op {
-            PqlToken::Eq => PakQuery::Equal(self.key, self.value),
+            PqlToken::Eq => PakQuery::Equal(self.key, self.value, PhantomData),
             PqlToken::Less => PakQuery::LessThan(self.key, self.value),
             PqlToken::LessEq => PakQuery::LessThanEqual(self.key, self.value),
             PqlToken::Greater => PakQuery::GreaterThan(self.key, self.value),
