@@ -77,6 +77,9 @@ fn float(lex : &mut Lexer<PqlToken>) -> Option<f64> {
 //==============================================================================================
 
 pub fn pql<T : PakItemDeserializeGroup + 'static>(source : &str) -> PakResult<Box<dyn PakQueryExpression<T>>> {
+    if source.starts_with("all") || source.is_empty() {
+        return Ok(Box::new(PakQuery::All));
+    }
     let mut lexer = Lexer::new(source).peekable();
     match PqlQuery::parse(&mut lexer) {
         Ok(query) => {Ok(query.eval())},
@@ -283,7 +286,7 @@ fn check_statement_op<I : Iterator<Item =TokenResult>>(lexer : &mut Peekable<I>)
 mod test {
     use logos::Lexer;
 
-    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlGroup, PqlQuery, PqlStatement, PqlToken}, test::{Person, build_data_base}, value::PakValue};
+    use crate::{index::PakIndexIdentifier, query::pql::{PqlExpression, PqlGroup, PqlQuery, PqlStatement, PqlToken}, test::{Person, Pet, alice_smith, bob_johnson, build_data_base, jane_doe, john_doe, john_jacob}, value::PakValue};
 
     #[test]
     fn pql_parse_query() {
@@ -331,5 +334,21 @@ mod test {
         assert_eq!(people.len(), other_people.len());
         assert!(people.iter().all(|person| person.personallity_traits.contains(&crate::test::PersonalityTrait::Patient)));
         assert!(other_people.iter().all(|person| person.personallity_traits.contains(&crate::test::PersonalityTrait::Patient)));
+    }
+    
+    #[test]
+    fn pql_all() {
+        let (pak, _, _) = build_data_base();
+        let pql = "all";
+        let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
+        
+        assert_eq!(people.len(), 7);
+        assert_eq!(pets.len(), 3);
+        
+        assert!(people.contains(&john_doe()));
+        assert!(people.contains(&jane_doe()));
+        assert!(people.contains(&alice_smith()));
+        assert!(people.contains(&john_jacob()));
+        assert!(people.contains(&bob_johnson()));
     }
 }
