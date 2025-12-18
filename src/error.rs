@@ -16,7 +16,7 @@ pub enum PakError {
     InsertRuleItemError(String),
     #[error("There was an error packing the module: {0}")]
     BincodeError(#[from] Box<bincode::ErrorKind>),
-    #[error("There was an error packing the module: {0}")]
+    #[error("{0}")]
     FileError(#[from] std::io::Error),
     #[error("PQL Error")]
     PqlError(#[from] PqlError),

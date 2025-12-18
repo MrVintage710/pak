@@ -303,3 +303,32 @@ fn compound_intersection_query() {
     assert_eq!(people.len(), 2);
     assert_eq!(pets.len(), 0);
 }
+
+#[test] 
+fn pak_file_read_write() {
+    let mut builder = PakBuilder::new();
+    
+    builder.pak(john_doe()).unwrap();
+    builder.pak(jane_doe()).unwrap();
+    builder.pak(alice_smith()).unwrap();
+    builder.pak(bob_johnson()).unwrap();
+    builder.pak(charlie_brown()).unwrap();
+    builder.pak(john_jacob()).unwrap();
+    builder.pak(ajax_burnahm()).unwrap();
+    
+    let pak = builder.build_file("temp.pak").unwrap();
+    
+    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+    assert_eq!(people.len(), 2);
+    assert!(people.contains(&john_doe()));
+    assert!(people.contains(&john_jacob()));
+    
+    let pak = Pak::new_from_file("temp.pak").unwrap();
+    
+    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+    assert_eq!(people.len(), 2);
+    assert!(people.contains(&john_doe()));
+    assert!(people.contains(&john_jacob()));
+    
+    std::fs::remove_file("temp.pak").unwrap();
+}

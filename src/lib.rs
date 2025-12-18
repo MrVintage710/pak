@@ -29,6 +29,8 @@ pub mod builder;
 
 pub const PAK_FILE_VERSION : &'static str = "1.1";
 
+pub const PAK_SIZING_STRUCT_SIZE_IN_BYTES : u64 = 32;
+
 /// Represents a Pak file. This struct provides access to the metadata and data stored within the Pak file.
 pub struct Pak {
     sizing : PakSizing,
@@ -39,11 +41,11 @@ pub struct Pak {
 impl Pak {
     /// Creates a new Pak instance from a [PakSource](crate::PakSource).
     pub fn new<S>(mut source : S) -> PakResult<Self> where S : PakSource + Send + Sync + 'static {
-        let sizing_pointer = PakPointer::new_untyped(0, 24);
+        let sizing_pointer = PakPointer::new_untyped(0, PAK_SIZING_STRUCT_SIZE_IN_BYTES);
         let sizing_buffer = source.read(&sizing_pointer, 0)?;
         let sizing : PakSizing = bincode::deserialize(&sizing_buffer)?;
         
-        let meta_pointer = PakPointer::new_untyped(24, sizing.meta_size);
+        let meta_pointer = PakPointer::new_untyped(PAK_SIZING_STRUCT_SIZE_IN_BYTES, sizing.meta_size);
         let meta_buffer = source.read(&meta_pointer, 0)?;
         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
 
@@ -144,7 +146,7 @@ impl Pak {
     }
     
     pub(crate) fn get_indices_start(&self) -> u64 {
-        32 + self.sizing.meta_size
+        PAK_SIZING_STRUCT_SIZE_IN_BYTES + self.sizing.meta_size
     }
 }
 
