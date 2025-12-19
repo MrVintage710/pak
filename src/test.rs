@@ -316,12 +316,14 @@ fn pak_file_read_write() {
     builder.pak(john_jacob()).unwrap();
     builder.pak(ajax_burnahm()).unwrap();
     
-    let pak = builder.build_file("temp.pak").unwrap();
-    
-    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
-    assert_eq!(people.len(), 2);
-    assert!(people.contains(&john_doe()));
-    assert!(people.contains(&john_jacob()));
+    {
+        let pak = builder.build_file("temp.pak").unwrap();
+        
+        let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+        assert_eq!(people.len(), 2);
+        assert!(people.contains(&john_doe()));
+        assert!(people.contains(&john_jacob()));
+    }
     
     let pak = Pak::new_from_file("temp.pak").unwrap();
     
