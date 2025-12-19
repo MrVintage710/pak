@@ -1,6 +1,5 @@
 use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor}, path::Path, sync::RwLock};
 
-use serde::{Deserialize, Serialize};
 
 use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::PakIndex, item::{PakItemDeserialize, PakItemSearchable, PakItemSerialize}, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
 
@@ -189,6 +188,3 @@ pub(crate) struct PakVaultReference {
     pointer : PakPointer,
     indices : Vec<PakIndex>
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct List(pub Vec<PakPointer>);
