@@ -334,3 +334,21 @@ fn pak_file_read_write() {
     
     std::fs::remove_file("temp.pak").unwrap();
 }
+
+#[test]
+fn extra_meta() {
+    let mut builder = PakBuilder::new();
+    
+    #[derive(Serialize, Deserialize)]
+    struct ExtraMeta {
+        test : String
+    }
+    
+    builder.set_extra(ExtraMeta {
+        test : "Test".to_string()
+    }).unwrap();
+    
+    let pak = builder.build_in_memory().unwrap();
+    let extra = pak.meta.get_extra::<ExtraMeta>().unwrap();
+    assert_eq!(extra.test, "Test")
+}

@@ -15,6 +15,7 @@ pub struct PakBuilder {
     name: String,
     description: String,
     author: String,
+    extra : Vec<u8>
 }
 
 impl PakBuilder {
@@ -27,6 +28,7 @@ impl PakBuilder {
             name: String::new(),
             description: String::new(),
             author: String::new(),
+            extra : Vec::new()
         }
     }
     
@@ -94,6 +96,11 @@ impl PakBuilder {
         self.author = author.to_string();
     }
     
+    pub fn set_extra<T>(&mut self, value : T) -> PakResult<()> where T : PakItemSerialize {
+        self.extra = value.into_bytes()?;
+        Ok(())
+    }
+    
     /// Builds the pak file and writes it to the specified path. This also returns a [Pak](crate::Pak) object that is attached to that file.
     pub fn build_file(self, path : impl AsRef<Path>) -> PakResult<Pak> {
         let (out, sizing, meta) = self.build_internal()?;
@@ -154,6 +161,7 @@ impl PakBuilder {
             description: self.description,
             author: self.author,
             version: PAK_FILE_VERSION.to_string(),
+            extra : self.extra
         };
         
         let sizing = PakSizing {
