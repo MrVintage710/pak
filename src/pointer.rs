@@ -1,7 +1,7 @@
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, query::PakQueryExpression};
+use crate::{Pak, error::PakResult, item::PakItemDeserialize, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
@@ -81,6 +81,18 @@ impl PakQueryExpression for PakPointer {
     }
 }
 
+impl From<PakTypedPointer> for PakPointer {
+    fn from(value: PakTypedPointer) -> Self {
+        PakPointer::Typed(value)
+    }
+}
+
+impl From<PakUntypedPointer> for PakPointer {
+    fn from(value: PakUntypedPointer) -> Self {
+        PakPointer::Untyped(value)
+    }
+}
+
 //==============================================================================================
 //        PakTypedPointer
 //==============================================================================================
@@ -121,5 +133,55 @@ impl PakUntypedPointer {
     
     pub fn as_pointer(&self) -> PakPointer {
         PakPointer::Untyped(*self)
+    }
+}
+
+//==============================================================================================
+//        PakCache
+//==============================================================================================
+
+pub struct PakCache<T> where T : PakItemDeserialize {
+    pointer : PakPointer,
+    cache : Option<T>
+}
+
+impl <T> PakCache<T> where T : PakItemDeserialize {
+    
+    pub fn fetch(&mut self, pak : &Pak) -> PakResult<&T> {
+        if self.cache.is_some() {
+            Ok(self.cache.as_ref().unwrap())
+        } else {
+            let value = pak.read_err::<T>(&self.pointer)?;
+            self.cache = Some(value);
+            Ok(self.cache.as_ref().unwrap())
+        }
+    }
+    
+    pub fn fetch_mut(&mut self, pak : &Pak) -> PakResult<&mut T> {
+        if self.cache.is_some() {
+            Ok(self.cache.as_mut().unwrap())
+        } else {
+            let value = pak.read_err::<T>(&self.pointer)?;
+            self.cache = Some(value);
+            Ok(self.cache.as_mut().unwrap())
+        }
+    }
+    
+    pub fn unwrap(self) -> T {
+        self.cache.unwrap()
+    }
+    
+    pub fn get(&self) -> Option<&T> {
+        self.cache.as_ref()
+    }
+    
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        self.cache.as_mut()
+    }
+}
+
+impl <T> From<PakPointer> for PakCache<T> where T : PakItemDeserialize {
+    fn from(value: PakPointer) -> Self {
+        PakCache { pointer: value, cache: None }
     }
 }
