@@ -2,9 +2,9 @@ use std::{cmp::Ordering, collections::{HashMap, VecDeque}, fmt::Debug};
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::{PakError, PakResult}, pointer::{PakPointer, PakUntypedPointer}};
+use crate::{builder::PakBuilder, error::{PakError, PakResult}, pointer::{PakPointer, PakUntypedPointer}};
 
-use super::{value::PakValue, Pak, PakBuilder};
+use super::{value::PakValue, Pak};
 
 
 //==============================================================================================
@@ -156,14 +156,13 @@ impl <'p> PakTree<'p> {
     
     fn get_contains_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>) -> PakResult<()> {
         let page : PakTreePage = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
-        
         for entry in page.values {
             if entry.key.contains(value) {
                 entry.values.clone().into_iter().for_each(|value| {set.insert(value);});
-                if let Some(index) = entry.previous {
-                    let pointer = self.meta.pages.get(&index).unwrap();
-                    self.get_contains_r(value, *pointer, set)?;
-                }
+            }
+            if let Some(index) = entry.previous {
+                let pointer = self.meta.pages.get(&index).unwrap();
+                self.get_contains_r(value, *pointer, set)?;
             }
         }
         
@@ -175,7 +174,7 @@ impl <'p> PakTree<'p> {
 //        PakTreeMeta
 //==============================================================================================
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct PakTreeMeta {
     pages: HashMap<usize, PakUntypedPointer>,
 }
@@ -209,7 +208,6 @@ impl PakTreeBuilder {
     }
     
     pub fn into_pak(self, pak : &mut PakBuilder) -> PakResult<PakPointer> {
-        
         let mut page_map = HashMap::<usize, PakUntypedPointer>::new();
         for (index, page) in self.pages.into_iter().enumerate() {
             let pointer = pak.pak_no_search(page)?;

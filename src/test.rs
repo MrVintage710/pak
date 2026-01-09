@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, value::{IntoPakValue, PakValue}, Pak, PakBuilder};
+use crate::{Pak, builder::PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -88,59 +88,80 @@ impl PakItemSearchable for Pet {
     }
 }
 
-/// This is the unofficial build test, this runs in every test
-pub fn build_data_base() -> (Pak, PakPointer, PakPointer) {
-    let mut builder = PakBuilder::new();
-    
-    let person1 = Person {
+pub(crate) fn john_doe() -> Person {
+    Person {
         first_name: "John".to_string(),
         last_name: "Doe".to_string(),
         age: 30,
         personallity_traits: vec![PersonalityTrait::Patient, PersonalityTrait::Creative, PersonalityTrait::Extroverted]
-    };
-    
-    let person2 = Person {
+    }
+}
+
+pub(crate) fn jane_doe() -> Person {
+    Person {
         first_name: "Jane".to_string(),
         last_name: "Doe".to_string(),
         age: 25,
         personallity_traits: vec![PersonalityTrait::Responsible, PersonalityTrait::Introverted, PersonalityTrait::Intelligent]
-    };
-    
-    let person3 = Person {
+    }
+}
+
+pub(crate) fn alice_smith() -> Person {
+    Person {
         first_name: "Alice".to_string(),
         last_name: "Smith".to_string(),
         age: 28,
         personallity_traits: vec![PersonalityTrait::Brave, PersonalityTrait::Adventurous, PersonalityTrait::Curious]
-    };
-    
-    let person4 = Person {
+    }
+}
+
+pub(crate) fn bob_johnson() -> Person {
+    Person {
         first_name: "Bob".to_string(),
         last_name: "Johnson".to_string(),
         age: 35,
         personallity_traits: vec![PersonalityTrait::Patient, PersonalityTrait::Creative, PersonalityTrait::Extroverted]
-    };
-    
-    let person5 = Person {
+    }
+}
+
+pub(crate) fn charlie_brown() -> Person {
+    Person {
         first_name: "Charlie".to_string(),
         last_name: "Brown".to_string(),
         age: 40,
         personallity_traits: vec![PersonalityTrait::Responsible, PersonalityTrait::Introverted, PersonalityTrait::Intelligent]
-    };
-    
-    let person6 = Person {
+    }
+}
+
+pub(crate) fn john_jacob() -> Person {
+    Person {
         first_name: "John".to_string(),
         last_name: "Jacob".to_string(),
         age: 45,
         personallity_traits: vec![PersonalityTrait::Patient, PersonalityTrait::Creative, PersonalityTrait::Extroverted]
-    };
-    
-    let person7 = Person {
+    }
+}
+
+pub(crate) fn ajax_burnahm() -> Person {
+    Person {
         first_name: "Ajax".to_string(),
         last_name: "Burnahm".to_string(),
         age: 30,
         personallity_traits: vec![PersonalityTrait::Responsible, PersonalityTrait::Introverted, PersonalityTrait::Intelligent]
-    };
+    }
+}
+
+/// This is the unofficial build test, this runs in every test
+pub(crate) fn build_data_base() -> (Pak, PakPointer, PakPointer) {
+    let mut builder = PakBuilder::new();
     
+    let person1 = john_doe();
+    let person2 = jane_doe();
+    let person3 = alice_smith();
+    let person4 = bob_johnson();
+    let person5 = charlie_brown();
+    let person6 = john_jacob();
+    let person7 = ajax_burnahm();
     
     let owner1 = builder.pak(person1).unwrap();
     let owner2 = builder.pak(person2).unwrap();
@@ -239,10 +260,21 @@ fn pak_query_less_than_equal() {
 fn pak_query_contains() {
     let (pak, _, _) = build_data_base();
     
-    let query = "personality_traits".contains_value(PersonalityTrait::Creative);
+    let query = "personallity_traits".contains_value(PersonalityTrait::Creative);
     let people = pak.query::<(Person,)>(query).unwrap();
     
     assert_eq!(people.len(), 3);
+}
+
+#[test]
+fn pak_query_all() {
+    let (pak, _, _) = build_data_base();
+    
+    let query = PakQuery::All;
+    let (pets, people) = pak.query::<(Pet, Person)>(query).unwrap();
+    
+    assert_eq!(people.len(), 7);
+    assert_eq!(pets.len(), 3);
 }
 
 #[test]
@@ -254,6 +286,11 @@ fn compound_union_query() {
     
     assert_eq!(people.len(), 4);
     assert_eq!(pets.len(), 3);
+    
+    assert!(people.contains(&john_doe()));
+    assert!(people.contains(&john_jacob()));
+    assert!(people.contains(&alice_smith()));
+    assert!(people.contains(&jane_doe()));
 }
 
 #[test]
@@ -265,4 +302,35 @@ fn compound_intersection_query() {
     
     assert_eq!(people.len(), 2);
     assert_eq!(pets.len(), 0);
+}
+
+#[test] 
+fn pak_file_read_write() {
+    let mut builder = PakBuilder::new();
+    
+    builder.pak(john_doe()).unwrap();
+    builder.pak(jane_doe()).unwrap();
+    builder.pak(alice_smith()).unwrap();
+    builder.pak(bob_johnson()).unwrap();
+    builder.pak(charlie_brown()).unwrap();
+    builder.pak(john_jacob()).unwrap();
+    builder.pak(ajax_burnahm()).unwrap();
+    
+    {
+        let pak = builder.build_file("temp.pak").unwrap();
+        
+        let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+        assert_eq!(people.len(), 2);
+        assert!(people.contains(&john_doe()));
+        assert!(people.contains(&john_jacob()));
+    }
+    
+    let pak = Pak::new_from_file("temp.pak").unwrap();
+    
+    let people = pak.query::<(Person, )>("first_name".equals("John")).unwrap();
+    assert_eq!(people.len(), 2);
+    assert!(people.contains(&john_doe()));
+    assert!(people.contains(&john_jacob()));
+    
+    std::fs::remove_file("temp.pak").unwrap();
 }
