@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, item::PakItemDeserialize};
+use crate::{error::PakResult};
 
 /// The metadata for a Pak file. Each pak file has this data embedded within the header.
 #[derive(Serialize, Deserialize)]
@@ -13,8 +13,8 @@ pub struct PakMeta {
 }
 
 impl PakMeta {
-    pub fn get_extra<T>(&self) -> PakResult<T> where T : PakItemDeserialize {
-        T::from_bytes(&self.extra)
+    pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
+        Ok(bincode::deserialize(&self.extra)?)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::{item::PakItemDeserializeGroup, pointer::PakUntypedPointer, query::PakQuery, value::IntoPakValue};
+use crate::{group::DeserializeGroup, pointer::PakUntypedPointer, query::PakQuery, value::IntoPakValue};
 
 use super::value::PakValue;
 
@@ -32,27 +32,27 @@ impl PakIndex {
 pub trait PakIndexIdentifier {
     fn identifier(&self) -> &str;
     
-    fn equals<T, V>(&self, other: V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn equals<T, V>(&self, other: V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::equals(self.identifier(), other.into_pak_value())
     }
     
-    fn less_than<T, V>(&self, other: V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn less_than<T, V>(&self, other: V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::less_than(self.identifier(), other.into_pak_value())
     }
     
-    fn greater_than<T, V>(&self, other: V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn greater_than<T, V>(&self, other: V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::greater_than(self.identifier(), other.into_pak_value())
     }
     
-    fn greater_than_or_equal<T, V>(&self, other: V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn greater_than_or_equal<T, V>(&self, other: V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::greater_than_or_equal(self.identifier(), other.into_pak_value())
     }
     
-    fn less_than_or_equal<T, V>(&self, other: V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn less_than_or_equal<T, V>(&self, other: V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::less_than_or_equal(self.identifier(), other.into_pak_value())
     }
     
-    fn contains_value<T, V>(&self, other : V) -> PakQuery<T> where T : PakItemDeserializeGroup, V : IntoPakValue {
+    fn contains_value<T, V>(&self, other : V) -> PakQuery<T> where T : DeserializeGroup, V : IntoPakValue {
         PakQuery::contains(self.identifier(), other.into_pak_value())
     }
 }

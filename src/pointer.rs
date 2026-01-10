@@ -1,7 +1,7 @@
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{Pak, error::PakResult, item::{PakItemDeserialize, PakItemDeserializeGroup}, query::PakQueryExpression};
+use crate::{Pak, error::PakResult, group::{DeserializeGroup}, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
@@ -80,7 +80,7 @@ impl Clone for PakPointer {
     }
 }
 
-impl <T> PakQueryExpression<T> for PakPointer where T : PakItemDeserializeGroup {
+impl <T> PakQueryExpression<T> for PakPointer where T : DeserializeGroup {
     fn execute(&self, _pak : &crate::Pak) -> PakResult<OrderSet<PakPointer>> {
         Ok(OrderSet::from([self.clone()]))
     }
@@ -145,12 +145,12 @@ impl PakUntypedPointer {
 //        PakCache
 //==============================================================================================
 
-pub struct PakCache<T> where T : PakItemDeserialize {
+pub struct PakCache<T> where T : for<'de> Deserialize<'de> {
     pointer : PakPointer,
     cache : Option<T>
 }
 
-impl <T> PakCache<T> where T : PakItemDeserialize {
+impl <T> PakCache<T> where T : for<'de> Deserialize<'de> {
     
     pub fn fetch(&mut self, pak : &Pak) -> PakResult<&T> {
         if self.cache.is_some() {
@@ -185,7 +185,7 @@ impl <T> PakCache<T> where T : PakItemDeserialize {
     }
 }
 
-impl <T> From<PakPointer> for PakCache<T> where T : PakItemDeserialize {
+impl <T> From<PakPointer> for PakCache<T> where T : for<'de> Deserialize<'de> {
     fn from(value: PakPointer) -> Self {
         PakCache { pointer: value, cache: None }
     }

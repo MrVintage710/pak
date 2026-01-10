@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{Pak, builder::PakBuilder, index::{PakIndex, PakIndexIdentifier}, item::PakItemSearchable, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
+use crate::{Pak, builder::PakBuilder, index::{PakIndex, PakIndexIdentifier}, group::PakSearchable, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -40,7 +40,7 @@ pub struct Person {
     pub personallity_traits : Vec<PersonalityTrait>
 }
 
-impl PakItemSearchable for Person {
+impl PakSearchable for Person {
     fn get_indices(&self) -> Vec<PakIndex> {
         let mut indices = Vec::new();
         indices.push(PakIndex::new("first_name", self.first_name.clone()));
@@ -78,7 +78,7 @@ impl IntoPakValue for PetKind {
     }
 }
 
-impl PakItemSearchable for Pet {
+impl PakSearchable for Pet {
     fn get_indices(&self) -> Vec<PakIndex> {
         let mut indices = Vec::new();
         indices.push(PakIndex::new("name", self.name.clone()));
@@ -163,13 +163,13 @@ pub(crate) fn build_data_base() -> (Pak, PakPointer, PakPointer) {
     let person6 = john_jacob();
     let person7 = ajax_burnahm();
     
-    let owner1 = builder.pak(person1).unwrap();
-    let owner2 = builder.pak(person2).unwrap();
-    builder.pak(person3).unwrap();
-    builder.pak(person4).unwrap();
-    builder.pak(person5).unwrap();
-    builder.pak(person6).unwrap();
-    builder.pak(person7).unwrap();
+    let owner1 = builder.pak(&person1).unwrap();
+    let owner2 = builder.pak(&person2).unwrap();
+    builder.pak(&person3).unwrap();
+    builder.pak(&person4).unwrap();
+    builder.pak(&person5).unwrap();
+    builder.pak(&person6).unwrap();
+    builder.pak(&person7).unwrap();
     
     let pet1 = Pet {
         name: "Fido".to_string(),
@@ -192,9 +192,9 @@ pub(crate) fn build_data_base() -> (Pak, PakPointer, PakPointer) {
         kind: PetKind::Dog,
     };
     
-    builder.pak(pet1).unwrap();
-    builder.pak(pet2).unwrap();
-    builder.pak(pet3).unwrap();
+    builder.pak(&pet1).unwrap();
+    builder.pak(&pet2).unwrap();
+    builder.pak(&pet3).unwrap();
     
     (builder.build_in_memory().unwrap(), owner1, owner2)
 }
@@ -308,13 +308,13 @@ fn compound_intersection_query() {
 fn pak_file_read_write() {
     let mut builder = PakBuilder::new();
     
-    builder.pak(john_doe()).unwrap();
-    builder.pak(jane_doe()).unwrap();
-    builder.pak(alice_smith()).unwrap();
-    builder.pak(bob_johnson()).unwrap();
-    builder.pak(charlie_brown()).unwrap();
-    builder.pak(john_jacob()).unwrap();
-    builder.pak(ajax_burnahm()).unwrap();
+    builder.pak(&john_doe()).unwrap();
+    builder.pak(&jane_doe()).unwrap();
+    builder.pak(&alice_smith()).unwrap();
+    builder.pak(&bob_johnson()).unwrap();
+    builder.pak(&charlie_brown()).unwrap();
+    builder.pak(&john_jacob()).unwrap();
+    builder.pak(&ajax_burnahm()).unwrap();
     
     {
         let pak = builder.build_file("temp.pak").unwrap();
@@ -344,7 +344,7 @@ fn extra_meta() {
         test : String
     }
     
-    builder.set_extra(ExtraMeta {
+    builder.set_extra(&ExtraMeta {
         test : "Test".to_string()
     }).unwrap();
     

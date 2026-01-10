@@ -210,11 +210,11 @@ impl PakTreeBuilder {
     pub fn into_pak(self, pak : &mut PakBuilder) -> PakResult<PakPointer> {
         let mut page_map = HashMap::<usize, PakUntypedPointer>::new();
         for (index, page) in self.pages.into_iter().enumerate() {
-            let pointer = pak.pak_no_search(page)?;
+            let pointer = pak.pak_no_search(&page)?;
             page_map.insert(index as usize, pointer.as_untyped());
         }
         
-        pak.pak_no_search(PakTreeMeta{ pages : page_map})
+        pak.pak_no_search(&PakTreeMeta{ pages : page_map})
     } 
 }
 

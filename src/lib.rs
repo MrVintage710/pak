@@ -3,10 +3,11 @@
 
 use std::{collections::HashMap, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{RwLock, RwLockWriteGuard}};
 use btree::PakTree;
-use item::{PakItemDeserialize, PakItemDeserializeGroup};
+use group::{DeserializeGroup};
 use meta::{PakMeta, PakSizing};
 use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
+use serde::Deserialize;
 
 use crate::{error::PakResult};
 
@@ -14,7 +15,7 @@ use crate::{error::PakResult};
 mod test;
 
 pub mod meta;
-pub mod item;
+pub mod group;
 pub mod index;
 pub mod value;
 pub(crate) mod btree;
@@ -59,13 +60,13 @@ impl Pak {
     }
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
-    pub fn query<T>(&self, query : impl PakQueryExpression<T>) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup  {
+    pub fn query<T>(&self, query : impl PakQueryExpression<T>) -> PakResult<T::ReturnType> where T : DeserializeGroup  {
         let pointers = query.execute(self)?.into_iter().collect();
         T::deserialize_group(self, pointers)
     }
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
-    pub fn query_sql<T>(&self, pql : &str) -> PakResult<T::ReturnType> where T : PakItemDeserializeGroup + 'static  {
+    pub fn query_sql<T>(&self, pql : &str) -> PakResult<T::ReturnType> where T : DeserializeGroup + 'static  {
         let query = crate::query::pql::pql(pql)?;
         self.query::<T>(query)
     }
@@ -95,19 +96,19 @@ impl Pak {
         &self.meta.description
     }
     
-    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakItemDeserialize {
+    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse)};
         self.read_internal(pointer, &mut source)
     }
     
-    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : PakItemDeserialize {
+    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : for<'de> Deserialize<'de> {
         self.read_err::<T>(pointer).ok()
     }
     
-    fn read_internal<T>(&self, pointer : &PakPointer, source : &mut RwLockWriteGuard<Box<dyn PakSource + Send + Sync + 'static>>) -> PakResult<T> where T : PakItemDeserialize {
+    fn read_internal<T>(&self, pointer : &PakPointer, source : &mut RwLockWriteGuard<Box<dyn PakSource + Send + Sync + 'static>>) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         let buffer = source.read(pointer, self.get_vault_start())?;
-        let res = T::from_bytes(&buffer)?;
+        let res = bincode::deserialize(&buffer)?;
         Ok(res)
     }
     
@@ -123,7 +124,7 @@ impl Pak {
         Ok(indices)
     }
     
-    pub(crate) fn fetch_all_pointers_of<T>(&self) -> PakResult<Vec<PakPointer>> where T : PakItemDeserializeGroup {
+    pub(crate) fn fetch_all_pointers_of<T>(&self) -> PakResult<Vec<PakPointer>> where T : DeserializeGroup {
         let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
         let lists_pointer = PakPointer::new_untyped(self.get_list_start(), self.sizing.list_size);
         let lists_buffer = source.read(&lists_pointer, 0)?;

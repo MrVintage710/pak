@@ -1,7 +1,9 @@
 use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor}, path::Path, sync::RwLock};
 
 
-use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::PakIndex, item::{PakItemDeserialize, PakItemSearchable, PakItemSerialize}, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
+use serde::Serialize;
+
+use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::PakIndex, group::{PakSearchable}, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
 
 //==============================================================================================
 //        PakBuilder
@@ -33,8 +35,8 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that does not support searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize).
-    pub fn pak_no_search<T: PakItemSerialize + Debug + PakItemDeserialize>(&mut self, item : T) -> PakResult<PakPointer> {
-        let bytes = item.into_bytes()?;
+    pub fn pak_no_search<T>(&mut self, item : &T) -> PakResult<PakPointer> where T : Serialize {
+        let bytes = bincode::serialize(item)?;
         let pointer = PakPointer::new_untyped(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
@@ -43,9 +45,9 @@ impl PakBuilder {
     }
     
     /// Adds an item to the pak file that supports searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize) and [PakItemSearchable](crate::PakItemSearchable).
-    pub fn pak<T : PakItemSerialize + PakItemSearchable>(&mut self, item : T) -> PakResult<PakPointer> {
+    pub fn pak<T>(&mut self, item : &T) -> PakResult<PakPointer> where T : Serialize + PakSearchable {
         let indices = item.get_indices();
-        let bytes = item.into_bytes()?;
+        let bytes = bincode::serialize(item)?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
@@ -96,8 +98,8 @@ impl PakBuilder {
         self.author = author.to_string();
     }
     
-    pub fn set_extra<T>(&mut self, value : T) -> PakResult<()> where T : PakItemSerialize {
-        self.extra = value.into_bytes()?;
+    pub fn set_extra<T>(&mut self, value : &T) -> PakResult<()> where T : Serialize {
+        self.extra = bincode::serialize(value)?;
         Ok(())
     }
     
@@ -152,7 +154,7 @@ impl PakBuilder {
         
         let mut lists = HashMap::<String, PakPointer>::new();
         for (type_name, list) in list_values.into_iter() {
-            let pointer = self.pak_no_search(list)?;
+            let pointer = self.pak_no_search(&list)?;
             lists.insert(type_name, pointer);
         }
         
