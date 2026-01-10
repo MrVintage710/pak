@@ -54,8 +54,17 @@ You also may want to implement the [PakItemSearchable](crate::PakItemSearchable)
 
 ```rust
 impl PakItemSearchable for Person {
-    fn get_indices(&self) -> PakResult<Vec<PakIndex>> {
-        vec![PakIndex::new("name", self.name.clone())]
+    fn get_indices(&self, indices : &mut Indices) {
+        // The following values can be used as indices: 
+        // &str
+        // String
+        // f64, f32
+        // i64, i32, i16, i8
+        // u64, u32, u16, u8
+        // bool
+        // Plus any type above inside of: Option<T>, Vec<T>
+        indices.add("name", self.name.clone());
+        indices.add("age", self.age.clone());
     }
 }
 ```
