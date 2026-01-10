@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{Pak, builder::PakBuilder, index::{PakIndex, PakIndexIdentifier}, group::PakSearchable, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
+use crate::{Pak, builder::PakBuilder, index::{Indices, PakIndexIdentifier, PakSearchable}, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -41,13 +41,11 @@ pub struct Person {
 }
 
 impl PakSearchable for Person {
-    fn get_indices(&self) -> Vec<PakIndex> {
-        let mut indices = Vec::new();
-        indices.push(PakIndex::new("first_name", self.first_name.clone()));
-        indices.push(PakIndex::new("last_name", self.last_name.clone()));
-        indices.push(PakIndex::new("age", self.age));
-        indices.push(PakIndex::new("personallity_traits", self.personallity_traits.clone()));
-        indices
+    fn get_indices(&self, indices : &mut Indices) {
+        indices.add("first_name", self.first_name.clone());
+        indices.add("last_name", self.last_name.clone());
+        indices.add("age", self.age.clone());
+        indices.add("personallity_traits", self.personallity_traits.clone());
     }
 }
 
@@ -79,12 +77,10 @@ impl IntoPakValue for PetKind {
 }
 
 impl PakSearchable for Pet {
-    fn get_indices(&self) -> Vec<PakIndex> {
-        let mut indices = Vec::new();
-        indices.push(PakIndex::new("name", self.name.clone()));
-        indices.push(PakIndex::new("age", self.age));
-        indices.push(PakIndex::new("kind", self.kind.clone()));
-        indices
+    fn get_indices(&self, indices : &mut Indices) {
+        indices.add("name", self.name.clone());
+        indices.add("age", self.age.clone());
+        indices.add("kind", self.kind.clone());
     }
 }
 

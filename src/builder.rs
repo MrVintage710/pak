@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cu
 
 use serde::Serialize;
 
-use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::PakIndex, group::{PakSearchable}, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
+use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::{Indices, PakIndex, PakSearchable}, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
 
 //==============================================================================================
 //        PakBuilder
@@ -46,12 +46,13 @@ impl PakBuilder {
     
     /// Adds an item to the pak file that supports searching. Takes anything that implements [PakItemSerialize](crate::PakItemSerialize) and [PakItemSearchable](crate::PakItemSearchable).
     pub fn pak<T>(&mut self, item : &T) -> PakResult<PakPointer> where T : Serialize + PakSearchable {
-        let indices = item.get_indices();
+        let mut indices = Indices::default();
+        item.get_indices(&mut indices);
         let bytes = bincode::serialize(item)?;
         let pointer = PakPointer::new_typed::<T>(self.size_in_bytes, bytes.len() as u64);
         self.size_in_bytes += bytes.len() as u64;
         self.vault.extend(bytes);
-        self.chunks.push(PakVaultReference { pointer: pointer.clone(), indices: indices.clone() });
+        self.chunks.push(PakVaultReference { pointer: pointer.clone(), indices: indices.unwrap() });
         Ok(pointer)
     }
     

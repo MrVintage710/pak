@@ -7,11 +7,32 @@ use super::value::PakValue;
 pub type PakIndices = HashMap<PakValue, Vec<PakUntypedPointer>>;
 
 //==============================================================================================
+//        PakItem Traits
+//==============================================================================================
+
+pub trait PakSearchable {
+    fn get_indices(&self, indices : &mut Indices);
+}
+
+#[derive(Default)]
+pub struct Indices(Vec<PakIndex>);
+
+impl Indices {
+    pub fn add<I, V>(&mut self, key : I, value : V) where I : PakIndexIdentifier, V : IntoPakValue {
+        self.0.push(PakIndex::new(key, value));
+    }
+    
+    pub(crate) fn unwrap(self) -> Vec<PakIndex> {
+        self.0
+    }
+}
+
+//==============================================================================================
 //        PakIndex
 //==============================================================================================
 
 #[derive(PartialEq, Debug, Clone, PartialOrd, Deserialize, Serialize)]
-pub struct PakIndex {
+pub(crate) struct PakIndex {
     pub key : String,
     pub value : PakValue
 }

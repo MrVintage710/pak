@@ -1,15 +1,6 @@
 use std::collections::HashSet;
 use serde::{Deserialize};
 use crate::{error::PakResult, pointer::PakPointer, Pak};
-use super::index::PakIndex;
-
-//==============================================================================================
-//        PakItem Traits
-//==============================================================================================
-
-pub trait PakSearchable {
-    fn get_indices(&self) -> Vec<PakIndex>;
-}
 
 //==============================================================================================
 //        PakItemDeserialzedGroup
