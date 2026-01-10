@@ -17,6 +17,7 @@ pub struct PakBuilder {
     name: String,
     description: String,
     author: String,
+    version : String,
     extra : Vec<u8>
 }
 
@@ -30,7 +31,8 @@ impl PakBuilder {
             name: String::new(),
             description: String::new(),
             author: String::new(),
-            extra : Vec::new()
+            extra : Vec::new(),
+            version : String::new()
         }
     }
     
@@ -99,9 +101,15 @@ impl PakBuilder {
         self.author = author.to_string();
     }
     
+    /// This function sets the extra data that is stored in the meta of the file.
     pub fn set_extra<T>(&mut self, value : &T) -> PakResult<()> where T : Serialize {
         self.extra = bincode::serialize(value)?;
         Ok(())
+    }
+    
+    /// This sets the version of the file in question.
+    pub fn set_version(&mut self, version: String) {
+        self.version = version;
     }
     
     /// Builds the pak file and writes it to the specified path. This also returns a [Pak](crate::Pak) object that is attached to that file.
@@ -120,7 +128,6 @@ impl PakBuilder {
     /// Builds the pak file and writes it to the specified path. This also returns a [Pak](crate::Pak) object that is attached to that slice of memory.
     pub fn build_in_memory(self) -> PakResult<Pak> {
         let (out, sizing, meta) = self.build_internal()?;
-        
         let pak = Pak {
             sizing,
             meta,
@@ -159,13 +166,17 @@ impl PakBuilder {
             lists.insert(type_name, pointer);
         }
         
+        let hash = sha256::digest(self.vault.as_slice());
         let meta = PakMeta {
+            identifier : format!("{hash}|{}|{}", self.name, self.version),
             name: self.name,
             description: self.description,
             author: self.author,
-            version: PAK_FILE_VERSION.to_string(),
+            version: self.version,
+            pak_version: PAK_FILE_VERSION.to_string(),
             extra : self.extra
         };
+        
         
         let sizing = PakSizing {
             meta_size: bincode::serialized_size(&meta)?,

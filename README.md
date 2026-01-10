@@ -120,4 +120,18 @@ Pak also contains a simple and light weight query language called pql (pak query
 let result = pak.query_pql::<(Person, )>("name = John & age < 35")
 ```
 
+If you want to query more then one type, just add it to the type signature
+
+```rust
+// Movie and Pet also derive Deserialize
+let result = pak.query_pql::<(Person, Pet, Movie)>("name = John | age < 35")
+```
+
+If you want to get all instances of a certain type from the Pak, you can do one of the following:
+
+```rust
+let result = pak.query_pql::<(Person, )>("all")
+let result = pak.query::<(Person,)>(PakQuery::All);
+```
+
 For more information on queries, see the [query](crate::query) documentation.

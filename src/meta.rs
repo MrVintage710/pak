@@ -7,12 +7,16 @@ use crate::{error::PakResult};
 pub struct PakMeta {
     pub name: String,
     pub version: String,
+    pub pak_version : String,
     pub description: String,
     pub author: String,
-    pub(crate) extra : Vec<u8>
+    pub identifier : String,
+    pub(crate) extra : Vec<u8>,
 }
 
 impl PakMeta {
+    /// This returns the extra data that can be saved in the metadata. This can throw an error if the
+    /// wrong type is asked for.
     pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         Ok(bincode::deserialize(&self.extra)?)
     }

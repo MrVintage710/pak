@@ -21,7 +21,9 @@ pub enum PakError {
     #[error("PQL Error")]
     PqlError(#[from] PqlError),
     #[error("Unable to find index `{0}` in Pak. Make sure that this index is correctly spelled.")]
-    InvalidIndex(String)
+    InvalidIndex(String),
+    #[error("Before interacting with a Pak file, identifier match check failed. This pointer must come from another file, or might be the wrong version.")]
+    PakIdentifierMismatch
 }
 
 pub type PqlResult<T> = Result<T, PqlError>;

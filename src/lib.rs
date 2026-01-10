@@ -36,7 +36,7 @@ pub const PAK_SIZING_STRUCT_SIZE_IN_BYTES : u64 = 32;
 pub struct Pak {
     sizing : PakSizing,
     meta : PakMeta,
-    source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>
+    source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>,
 }
 
 impl Pak {
@@ -104,6 +104,15 @@ impl Pak {
     
     pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : for<'de> Deserialize<'de> {
         self.read_err::<T>(pointer).ok()
+    }
+    
+    pub fn identifier(&self) -> &str {
+        &self.meta.identifier
+    }
+    
+    pub fn check_identifier(&self, id : &str) -> PakResult<()> {
+        if self.identifier() != id { return Err(error::PakError::PakIdentifierMismatch)}
+        Ok(())
     }
     
     fn read_internal<T>(&self, pointer : &PakPointer, source : &mut RwLockWriteGuard<Box<dyn PakSource + Send + Sync + 'static>>) -> PakResult<T> where T : for<'de> Deserialize<'de> {

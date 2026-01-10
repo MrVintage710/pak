@@ -14,6 +14,20 @@ pub trait DeserializeGroup {
     fn get_types() -> Vec<&'static str>;
 }
 
+impl <T> DeserializeGroup for (T, ) where T : for<'de> Deserialize<'de> {
+    type ReturnType = Vec<T>;
+    
+    fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType> {
+        Ok(pointers.iter().filter_map(|pointer| pak.read::<T>(pointer)).collect::<Vec<_>>())
+    }
+    
+    fn get_types() -> Vec<&'static str> {
+        vec![
+            std::any::type_name::<T>()
+        ]
+    }
+}
+
 macro_rules! impl_group {
     ( $( $name:ident )+ ) => {
         impl <$($name,)+> DeserializeGroup for ($($name, )+ ) where $($name : for<'de> Deserialize<'de>, )+ {
@@ -28,20 +42,6 @@ macro_rules! impl_group {
             }
         }
     };
-}
-
-impl <T> DeserializeGroup for (T, ) where T : for<'de> Deserialize<'de> {
-    type ReturnType = Vec<T>;
-    
-    fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType> {
-        Ok(pointers.iter().filter_map(|pointer| pak.read::<T>(pointer)).collect::<Vec<_>>())
-    }
-    
-    fn get_types() -> Vec<&'static str> {
-        vec![
-            std::any::type_name::<T>()
-        ]
-    }
 }
 
 impl_group!{ A B }
