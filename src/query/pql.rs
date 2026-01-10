@@ -329,7 +329,7 @@ mod test {
         let (pak, _, _) = build_data_base();
         let pql = "personallity_traits <- Patient";
         let query = "personallity_traits".contains_value("Patient");
-        let people = pak.query_sql::<(Person,)>(pql).unwrap();
+        let people = pak.query_pql::<(Person,)>(pql).unwrap();
         let other_people = pak.query::<(Person,)>(query).unwrap();
         assert_eq!(people.len(), other_people.len());
         assert!(people.iter().all(|person| person.personallity_traits.contains(&crate::test::PersonalityTrait::Patient)));
@@ -340,7 +340,7 @@ mod test {
     fn pql_all() {
         let (pak, _, _) = build_data_base();
         let pql = "all";
-        let (people, pets) = pak.query_sql::<(Person, Pet)>(pql).unwrap();
+        let (people, pets) = pak.query_pql::<(Person, Pet)>(pql).unwrap();
         
         assert_eq!(people.len(), 7);
         assert_eq!(pets.len(), 3);

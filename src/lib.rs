@@ -66,7 +66,7 @@ impl Pak {
     }
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
-    pub fn query_sql<T>(&self, pql : &str) -> PakResult<T::ReturnType> where T : DeserializeGroup + 'static  {
+    pub fn query_pql<T>(&self, pql : &str) -> PakResult<T::ReturnType> where T : DeserializeGroup + 'static  {
         let query = crate::query::pql::pql(pql)?;
         self.query::<T>(query)
     }

@@ -24,30 +24,31 @@ You shouldn't use Pak if you:
 
 There are 3 steps to using Pak. First you must make data to store, then you build the Pak, then you must query the data.
 
+## Adding Required Crates
+
+Make sure that you add the following to your `Cargo.toml` file:
+
+```toml
+[dependencies]
+pak-db = "0.2.0"
+serde = { version = "1.0.228", features = ["derive"] }
+```
+
+Serde is a crate that assists in serialzation and deserialisation of objects. The traits that it provides is needed to use Pak.
+
 ## Making Data Pakable
 
-To make data Pakable, you simply must implement the [PakItemSerialize](crate::PakItemSerialize) and [PakItemDeserialize](crate::PakItemDeserialize) traits.
+To make data Pakable, you simply must implement the [Serialize](serde::Serialize) and [Deserialize](searde::Deserialize) traits.
 
 ```rust
+#[derive(Serialize, Deserialize)]
 pub struct Person {
     name: String,
     age: u32,
 }
-
-impl PakItemSerialize for Person {
-    fn into_bytes(&self) -> PakResult<Vec<u8>> {
-        //...
-    }
-}
-
-impl PakItemDeserialize for Person {
-    fn from_bytes(bytes: &[u8]) -> PakResult<Self> {
-        //...
-    }
-}
 ```
 
-This will allow your types to be serialized and deserialized by Pak. Types that implement Serde's [Serialize](serde::Serialize) and [Deserialize](serde::Deserialize) traits will automatically implment these traits.
+This will allow your types to be serialized and deserialized by Pak.
 
 You also may want to implement the [PakItemSearchable](crate::PakItemSearchable) trait to allow your types to be searched by Pak.
 
@@ -84,7 +85,7 @@ let pak = paker.build_file("output.pak");
 let pak = paker.build_memory(); 
 ```
 
-Note that whenever you pak an object, the pointer to that object is returned. This is the primary way to access a non searchable object in the Pak file. You can save these pointers on any object in the pak, as they implement the [PakItemSerialize](crate::PakItemSerialize) and [PakItemDeserialize](crate::PakItemDeserialize) traits.
+Note that whenever you pak an object, the pointer to that object is returned. This is the primary way to access a non searchable object in the Pak file. You can save these pointers on any object in the pak, as they implement the [Serialize](serde::Serialize) and [Deserialize](searde::Deserialize) traits.
 
 ## Consuming a Pak File
 
@@ -102,6 +103,12 @@ let query = "name".equals("John");
 
 //This will query for all structs of type person with a name value of "John"
 let result = pak.query::<(Person,)>(query);
+```
+
+Pak also contains a simple and light weight query language called pql (pak query language). Here is an example of how to use it:
+
+```rust
+let result = pak.query_pql::<(Person, )>("name = John & age < 35")
 ```
 
 For more information on queries, see the [query](crate::query) documentation.
