@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, item::{PakItemDeserialize, PakItemSerialize}};
+use crate::{error::PakResult, item::PakItemDeserialize};
 
 /// The metadata for a Pak file. Each pak file has this data embedded within the header.
 #[derive(Serialize, Deserialize)]

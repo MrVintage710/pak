@@ -86,6 +86,18 @@ impl <T> PakQueryExpression<T> for PakPointer where T : PakItemDeserializeGroup 
     }
 }
 
+impl From<PakUntypedPointer> for PakPointer {
+    fn from(value: PakUntypedPointer) -> Self {
+        PakPointer::Untyped(value)
+    }
+}
+
+impl From<PakTypedPointer> for PakPointer {
+    fn from(value: PakTypedPointer) -> Self {
+        PakPointer::Typed(value)
+    }
+}
+
 //==============================================================================================
 //        PakTypedPointer
 //==============================================================================================
@@ -176,5 +188,19 @@ impl <T> PakCache<T> where T : PakItemDeserialize {
 impl <T> From<PakPointer> for PakCache<T> where T : PakItemDeserialize {
     fn from(value: PakPointer) -> Self {
         PakCache { pointer: value, cache: None }
+    }
+}
+
+impl <T> From<PakUntypedPointer> for PakCache<T> where for<'de> T : Deserialize<'de> {
+    fn from(value: PakUntypedPointer) -> Self {
+        let pointer : PakPointer = value.into();
+        pointer.into()
+    }
+}
+
+impl <T> From<PakTypedPointer> for PakCache<T> where for<'de> T : Deserialize<'de> {
+    fn from(value: PakTypedPointer) -> Self {
+        let pointer : PakPointer = value.into();
+        pointer.into()
     }
 }
