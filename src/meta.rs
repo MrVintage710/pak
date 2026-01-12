@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult};
-
 /// The metadata for a Pak file. Each pak file has this data embedded within the header.
 #[derive(Serialize, Deserialize)]
 pub struct PakMeta {
@@ -12,14 +10,6 @@ pub struct PakMeta {
     pub author: String,
     pub identifier : String,
     pub(crate) extra : Vec<u8>,
-}
-
-impl PakMeta {
-    /// This returns the extra data that can be saved in the metadata. This can throw an error if the
-    /// wrong type is asked for.
-    pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        Ok(bincode::deserialize(&self.extra)?)
-    }
 }
 
 /// This carries the size information of each part of the Pak file. this is always the first 32 bytes of the file.

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use crate::{Pak, builder::PakBuilder, index::{Indices, PakIndexIdentifier, PakSearchable}, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
+use crate::{Pak, builder::PakBuilder, group::{Defer, Pointer}, index::{Indices, PakIndexIdentifier, PakSearchable}, pointer::PakPointer, query::PakQuery, value::{IntoPakValue, PakValue}};
 
 //==============================================================================================
 //        Personallity Traits
@@ -213,6 +213,26 @@ fn pak_query_equal() {
 }
 
 #[test]
+fn pak_query_ref() {
+    let (pak, _, _) = build_data_base();
+    
+    let mut people = pak.query::<(Defer<Person>, )>("first_name".equals("John")).unwrap();
+    assert_eq!(people.len(), 2);
+    let mut person = people.pop().unwrap();
+    assert!(!person.is_loaded());
+    person.get().unwrap();
+    assert!(person.is_loaded())
+}
+
+#[test]
+fn pak_query_pointer() {
+    let (pak, _, _) = build_data_base();
+    
+    let people = pak.query::<(Pointer<Person>, )>("first_name".equals("John")).unwrap();
+    assert_eq!(people.len(), 2);
+}
+
+#[test]
 fn pak_query_less_than() {
     let (pak, _, _) = build_data_base();
     
@@ -345,6 +365,6 @@ fn extra_meta() {
     }).unwrap();
     
     let pak = builder.build_in_memory().unwrap();
-    let extra = pak.meta.get_extra::<ExtraMeta>().unwrap();
+    let extra = pak.get_extra::<ExtraMeta>().unwrap();
     assert_eq!(extra.test, "Test")
 }

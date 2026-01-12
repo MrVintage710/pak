@@ -18,12 +18,16 @@ pub enum PakError {
     BincodeError(#[from] Box<bincode::ErrorKind>),
     #[error("{0}")]
     FileError(#[from] std::io::Error),
-    #[error("PQL Error")]
+    #[error("PQL Error: {0}")]
     PqlError(#[from] PqlError),
     #[error("Unable to find index `{0}` in Pak. Make sure that this index is correctly spelled.")]
     InvalidIndex(String),
     #[error("Before interacting with a Pak file, identifier match check failed. This pointer must come from another file, or might be the wrong version.")]
-    PakIdentifierMismatch
+    PakIdentifierMismatch,
+    #[error("The related Pak source has been dropped, so the opperation could not continue.")]
+    PakDropped,
+    #[error("Tried to get PakRef value even though it has not been fetched yet. Must run fetch first.")]
+    PakRefNotFetched,
 }
 
 pub type PqlResult<T> = Result<T, PqlError>;
