@@ -1,7 +1,7 @@
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{Pak, error::PakResult, group::{DeserializeGroup}, query::PakQueryExpression};
+use crate::{error::PakResult, group::{DeserializeGroup}, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
