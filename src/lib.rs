@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png")]
 
-use std::{collections::HashMap, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{Arc, RwLock, RwLockWriteGuard, Weak}};
+use std::{collections::{HashMap, HashSet}, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{Arc, RwLock, RwLockWriteGuard, Weak}};
 use btree::PakTree;
 use group::{DeserializeGroup};
 use meta::{PakMeta, PakSizing};
@@ -9,7 +9,7 @@ use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
 use serde::Deserialize;
 
-use crate::{error::PakResult};
+use crate::{error::PakResult, pointer::PakTypedPointer};
 
 #[cfg(test)]
 mod test;
@@ -61,7 +61,7 @@ impl Pak {
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
     pub fn query<T>(&self, query : impl PakQueryExpression<T>) -> PakResult<T::ReturnType> where T : DeserializeGroup  {
-        let pointers = query.execute(self)?.into_iter().collect();
+        let pointers = query.execute(self)?.into_iter().collect::<HashSet<_>>();
         T::deserialize_group(self, pointers)
     }
     
@@ -99,7 +99,7 @@ impl Pak {
     /// This returns the extra data that can be saved in the metadata. This can throw an error if the
     /// wrong type is asked for.
     pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        Ok(bincode::deserialize(&self.inner.meta.extra)?)
+        self.inner.meta.get_extra()
     }
     
     /// Read Data directly with a pointer. 
@@ -141,11 +141,16 @@ impl Pak {
         let lists_pointer = PakPointer::new_untyped(self.get_list_start(), self.inner.sizing.list_size);
         let lists_buffer = source.read(&lists_pointer, 0)?;
         let lists : HashMap<String, PakPointer> = bincode::deserialize(&lists_buffer)?;
-        let values = T::get_types().into_iter()
-            .filter_map(|type_name| lists.get(type_name))
-            .filter_map(|pointer| self.inner.read_internal::<Vec<PakPointer>>(pointer, &mut source).ok())
-            .flatten()
-            .collect::<Vec<_>>();
+        
+        let mut values = Vec::new();
+        for type_name in T::get_types() {
+            let Some(list_pointer) = lists.get(type_name) else { continue };
+            let list = self.inner.read_internal::<Vec<PakPointer>>(list_pointer, &mut source)?;
+            list.iter()
+                .map(|pointer| PakTypedPointer::new(pointer.offset(), pointer.size(), type_name).into_pointer())
+                .for_each(|pointer| values.push(pointer));
+        }
+        
         Ok(values)
     }
     
@@ -171,7 +176,7 @@ pub(crate) struct PakInner {
 impl PakInner {
     fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
-        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse)};
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
         self.read_internal(pointer, &mut source)
     }
     

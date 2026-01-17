@@ -4,6 +4,8 @@ use crate::query::pql::PqlToken;
 
 pub type PakResult<T> = Result<T, PakError>;
 
+pub type PakException = Result<(), PakError>;
+
 #[derive(Error, Debug)]
 pub enum PakError {
     #[error("The source of the Pak is currenty being used by a seporate opperation.")]

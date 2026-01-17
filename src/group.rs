@@ -10,13 +10,20 @@ pub trait DeserializeUnit {
     type ReturnType;
     
      fn deserialize_unit(pak : &Pak, pointer : &PakPointer) -> PakResult<Self::ReturnType>;
+     
+     fn type_name() -> &'static str;
 }
 
 impl <T> DeserializeUnit for T where T : for<'de> Deserialize<'de> {
     type ReturnType = T;
 
     fn deserialize_unit(pak : &Pak, pointer : &PakPointer) -> PakResult<Self::ReturnType> {
-        pak.read_err::<T>(&pointer)
+        let result =  pak.read_err::<T>(&pointer)?;
+        Ok(result)
+    }
+
+    fn type_name() -> &'static str {
+        std::any::type_name::<T>()
     }
 }
 
@@ -41,7 +48,7 @@ impl <T> DeserializeGroup for (T, ) where T : DeserializeUnit {
     
     fn get_types() -> Vec<&'static str> {
         vec![
-            std::any::type_name::<T>()
+            T::type_name()
         ]
     }
 }
@@ -56,7 +63,7 @@ macro_rules! impl_group {
             }
             
             fn get_types() -> Vec<&'static str> {
-                vec![$(std::any::type_name::<$name>(), )+]
+                vec![$($name::type_name(), )+]
             }
         }
     };
@@ -125,7 +132,12 @@ impl <T> DeserializeUnit for Defer<T> where T : for<'de> Deserialize<'de> {
     type ReturnType = Defer<T>;
 
     fn deserialize_unit(pak : &Pak, pointer : &PakPointer) -> PakResult<Self::ReturnType> {
+        pointer.check_type::<T>()?;
         Ok(Defer::new(pak, pointer.clone()))
+    }
+
+    fn type_name() -> &'static str {
+        std::any::type_name::<T>()
     }
 }
 
@@ -139,6 +151,11 @@ impl <T> DeserializeUnit for Pointer<T> where T : for<'de> Deserialize<'de> {
     type ReturnType = PakPointer;
 
     fn deserialize_unit(_pak : &Pak, pointer : &PakPointer) -> PakResult<Self::ReturnType> {
+        pointer.check_type::<T>()?;
         Ok(pointer.clone())
+    }
+
+    fn type_name() -> &'static str {
+        std::any::type_name::<T>()
     }
 }

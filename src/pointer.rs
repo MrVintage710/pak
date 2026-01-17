@@ -1,7 +1,7 @@
 use ordermap::OrderSet;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::PakResult, group::{DeserializeGroup}, query::PakQueryExpression};
+use crate::{error::{PakError, PakException, PakResult}, group::DeserializeGroup, query::PakQueryExpression};
 
 //==============================================================================================
 //        PakPointer
@@ -62,6 +62,14 @@ impl PakPointer {
         match self {
             Self::Typed(ptr) => ptr.type_name == std::any::type_name::<T>(),
             Self::Untyped(_) => true,
+        }
+    }
+    
+    pub fn check_type<T>(&self) -> PakException {
+        if self.type_is_match::<T>() {
+            Ok(())
+        } else {
+            Err(PakError::TypeMismatchError(std::any::type_name::<T>().to_string(), self.type_name().to_string()))
         }
     }
     
