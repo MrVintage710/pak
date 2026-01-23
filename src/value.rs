@@ -13,6 +13,7 @@ pub enum PakValue {
     Uint(u64),
     Boolean(bool),
     Array(Vec<PakValue>),
+    Uuid(uuid::Uuid),
     #[default]
     Void
 }
@@ -40,6 +41,9 @@ impl PartialEq for PakValue {
                 let Some(first) = b.first() else { return false };
                 self == first
             },
+            (PakValue::Uuid(a), PakValue::Uuid(b)) => a.eq(b),
+            (PakValue::String(a), PakValue::Uuid(b)) => a.eq(&b.to_string()),
+            (PakValue::Uuid(a), PakValue::String(b)) => a.to_string().eq(b),
             (PakValue::Void, PakValue::Void) => true,
             _ => false,
         }
@@ -56,6 +60,7 @@ impl Debug for PakValue {
             PakValue::Boolean(boolean) => boolean.fmt(f),
             PakValue::Array(string_array) => string_array.fmt(f),
             PakValue::Void => f.write_str("Void"),
+            PakValue::Uuid(uuid) => uuid.fmt(f)
         }
     }
 }
@@ -83,6 +88,9 @@ impl PartialOrd for PakValue {
                 let Some(first) = b.first() else { return None };
                 self.partial_cmp(first)
             }
+            (PakValue::Uuid(a), PakValue::Uuid(b)) => a.partial_cmp(b),
+            (PakValue::String(a), PakValue::Uuid(b)) => a.partial_cmp(&b.to_string()),
+            (PakValue::Uuid(a), PakValue::String(b)) => a.to_string().partial_cmp(b),
             (PakValue::Void, PakValue::Void) => Some(std::cmp::Ordering::Equal),
             _ => None,
         }
@@ -254,6 +262,22 @@ impl PakValue {
             PakValue::Boolean(a) => Some(a.to_string()),
             PakValue::Void => Some("Void".to_string()),
             _ => None
+        }
+    }
+
+    /// Returns `true` if the pak value is [`Uuid`].
+    ///
+    /// [`Uuid`]: PakValue::Uuid
+    #[must_use]
+    pub fn is_uuid(&self) -> bool {
+        matches!(self, Self::Uuid(..))
+    }
+
+    pub fn as_uuid(&self) -> Option<&uuid::Uuid> {
+        if let Self::Uuid(v) = self {
+            Some(v)
+        } else {
+            None
         }
     }
 }

@@ -36,6 +36,7 @@ pub enum PqlToken {
     GroupStart,
     #[token(")")]
     GroupEnd,
+    #[regex("'[ a-zA-Z0-9_-]*'", text)]
     #[regex("[a-zA-Z_]([a-zA-Z0-9_-]+)?", text)]
     Text(String),
     #[regex("[0-9]+", int)]
@@ -308,7 +309,7 @@ mod test {
     
     #[test]
     fn pql_parse_expression() {
-        let pql = "age <= 20 | name >= J";
+        let pql = "age <= 20 | name >= 'J'";
         let mut lexer = Lexer::<PqlToken>::new(pql).peekable();
         let expr = PqlExpression::parse(&mut lexer).unwrap();
         assert_eq!(expr.first.key, "age");
