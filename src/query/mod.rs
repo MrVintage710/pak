@@ -16,6 +16,17 @@ pub trait PakQueryExpression<T> where T : DeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>>;
 }
 
+impl <T, Q> PakQueryExpression<T> for Vec<Q> where T : DeserializeGroup, Q : PakQueryExpression<T> {
+    fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
+        let results = self.iter()
+            .filter_map(|expression| expression.execute(pak).ok())
+            .flatten()
+            .collect::<OrderSet<_>>()
+        ;
+        Ok(results)
+    }
+}
+
 impl <T> PakQueryExpression<T> for Box<dyn PakQueryExpression<T>> where T : DeserializeGroup {
     fn execute(&self, pak : &Pak) -> PakResult<OrderSet<PakPointer>> {
         self.as_ref().execute(pak)

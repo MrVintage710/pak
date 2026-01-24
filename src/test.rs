@@ -273,6 +273,19 @@ fn pak_query_less_than_equal() {
 }
 
 #[test]
+fn pak_multiple_queries() {
+    let (pak, _, _) = build_data_base();
+    let queries = vec![
+        "age".less_than_or_equal(25),
+        "first_name".contains_value("John")
+    ];
+    let (people, pets) = pak.query::<(Person, Pet)>(queries).unwrap();
+    
+    assert_eq!(people.len(), 3);
+    assert_eq!(pets.len(), 3);
+}
+
+#[test]
 fn pak_query_contains() {
     let (pak, _, _) = build_data_base();
     

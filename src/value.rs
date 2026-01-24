@@ -4,6 +4,7 @@
 
 use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Clone, Hash, Default)]
 pub enum PakValue {
@@ -386,5 +387,11 @@ impl From<u8> for PakValue {
 impl From<bool> for PakValue {
     fn from(value: bool) -> Self {
         PakValue::Boolean(value)
+    }
+}
+
+impl From<Uuid> for PakValue {
+    fn from(value: Uuid) -> Self {
+        PakValue::Uuid(value)
     }
 }
