@@ -198,7 +198,7 @@ pub(crate) fn build_data_base() -> (Pak, PakPointer, PakPointer) {
 #[test]
 fn pak_read() {
     let (pak, john_doe, _) = build_data_base();
-    let person = pak.read_err::<Person>(&john_doe).unwrap();
+    let person = pak.read::<Person>(&john_doe).unwrap();
     
     assert_eq!(person.first_name, "John");
     assert_eq!(person.last_name, "Doe");

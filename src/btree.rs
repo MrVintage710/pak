@@ -20,7 +20,7 @@ impl <'p> PakTree<'p> {
     pub fn new(pak: &'p Pak, key : &str) -> PakResult<PakTree<'p>> {
         let indices = pak.fetch_indices()?;
         let Some(pointer) = indices.get(key) else { return Err(PakError::InvalidIndex(key.to_string())) };
-        let meta : PakTreeMeta = pak.read_err::<PakTreeMeta>(&pointer.as_pointer())?;
+        let meta : PakTreeMeta = pak.read::<PakTreeMeta>(&pointer.as_pointer())?;
         
         Ok(PakTree {
             pak,
@@ -36,7 +36,7 @@ impl <'p> PakTree<'p> {
     }
     
     fn get_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
+        let page : PakTreePage = self.pak.read::<PakTreePage>(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key < value {
@@ -76,7 +76,7 @@ impl <'p> PakTree<'p> {
     }
     
     fn get_less_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>, match_eq : bool) -> PakResult<()> {
-        let page = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
+        let page = self.pak.read::<PakTreePage>(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key > value {
@@ -119,7 +119,7 @@ impl <'p> PakTree<'p> {
     }
     
     fn get_greater_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>, match_eq : bool) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
+        let page : PakTreePage = self.pak.read::<PakTreePage>(&current_page.as_pointer())?;
         
         for entry in page.values {
             if &entry.key < value {
@@ -155,7 +155,7 @@ impl <'p> PakTree<'p> {
     }
     
     fn get_contains_r(&self, value : &PakValue, current_page : PakUntypedPointer, set : &mut OrderSet<PakPointer>) -> PakResult<()> {
-        let page : PakTreePage = self.pak.read_err::<PakTreePage>(&current_page.as_pointer())?;
+        let page : PakTreePage = self.pak.read::<PakTreePage>(&current_page.as_pointer())?;
         for entry in page.values {
             if entry.key.contains(value) {
                 entry.values.clone().into_iter().for_each(|value| {set.insert(value);});

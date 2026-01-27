@@ -1,6 +1,7 @@
-use std::{collections::HashSet, marker::PhantomData, sync::Weak};
+use std::{marker::PhantomData, sync::Weak};
+use ordermap::OrderSet;
 use serde::{Deserialize};
-use crate::{Pak, PakInner, error::{PakError, PakResult}, pointer::PakPointer};
+use crate::{Pak, PakInner, error::{PakError, PakResult}, item::PakDeserialize, pointer::PakPointer};
 
 //==============================================================================================
 //        DeseerializeUnit
@@ -14,11 +15,11 @@ pub trait DeserializeUnit {
      fn type_name() -> &'static str;
 }
 
-impl <T> DeserializeUnit for T where T : for<'de> Deserialize<'de> {
+impl <T> DeserializeUnit for T where T : PakDeserialize {
     type ReturnType = T;
 
     fn deserialize_unit(pak : &Pak, pointer : &PakPointer) -> PakResult<Self::ReturnType> {
-        let result =  pak.read_err::<T>(&pointer)?;
+        let result =  pak.read::<T>(&pointer)?;
         Ok(result)
     }
 
@@ -34,7 +35,7 @@ impl <T> DeserializeUnit for T where T : for<'de> Deserialize<'de> {
 pub trait DeserializeGroup {
     type ReturnType;
     
-    fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType>;
+    fn deserialize_group(pak : &Pak, pointers : OrderSet<PakPointer>) -> PakResult<Self::ReturnType>;
     
     fn get_types() -> Vec<&'static str>;
 }
@@ -42,7 +43,7 @@ pub trait DeserializeGroup {
 impl <T> DeserializeGroup for (T, ) where T : DeserializeUnit {
     type ReturnType = Vec<T::ReturnType>;
     
-    fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType> {
+    fn deserialize_group(pak : &Pak, pointers : OrderSet<PakPointer>) -> PakResult<Self::ReturnType> {
         Ok(pointers.iter().filter_map(|pointer| T::deserialize_unit(pak, pointer).ok()).collect::<Vec<_>>())
     }
     
@@ -58,7 +59,7 @@ macro_rules! impl_group {
         impl <$($name,)+> DeserializeGroup for ($($name, )+ ) where $($name : DeserializeUnit, )+ {
             type ReturnType = ($(Vec<$name::ReturnType>, )+);
             
-            fn deserialize_group(pak : &Pak, pointers : HashSet<PakPointer>) -> PakResult<Self::ReturnType> {
+            fn deserialize_group(pak : &Pak, pointers : OrderSet<PakPointer>) -> PakResult<Self::ReturnType> {
                 Ok(($(pointers.iter().filter_map(|pointer| $name::deserialize_unit(pak, pointer).ok()).collect::<Vec<_>>(),)+))
             }
             
@@ -100,7 +101,7 @@ impl <T> Defer<T> where T : for<'de> Deserialize<'de> {
     pub fn get(&mut self) -> PakResult<&T> {
         if let None = self.data {
             let Some(pak) = self.pak.upgrade() else { return Err(PakError::PakDropped) };
-            let value = pak.read_err::<T>(&self.pointer)?;
+            let value = pak.read::<T>(&self.pointer)?;
             self.data = Some(value);
         }
         Ok(self.data.as_ref().unwrap())
@@ -109,7 +110,7 @@ impl <T> Defer<T> where T : for<'de> Deserialize<'de> {
     pub fn get_mut(&mut self) -> PakResult<&mut T> {
         if let None = self.data {
             let Some(pak) = self.pak.upgrade() else { return Err(PakError::PakDropped) };
-            let value = pak.read_err::<T>(&self.pointer)?;
+            let value = pak.read::<T>(&self.pointer)?;
             self.data = Some(value);
         }
         Ok(self.data.as_mut().unwrap())

@@ -1,15 +1,16 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png")]
 
-use std::{collections::{HashMap, HashSet}, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{Arc, RwLock, RwLockWriteGuard, Weak}};
+use std::{collections::HashMap, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{Arc, RwLock, Weak}};
 use btree::PakTree;
 use group::{DeserializeGroup};
 use meta::{PakMeta, PakSizing};
+use ordermap::OrderSet;
 use pointer::{PakPointer, PakUntypedPointer};
 use query::PakQueryExpression;
 use serde::Deserialize;
 
-use crate::{error::PakResult, pointer::PakTypedPointer};
+use crate::{error::PakResult, item::PakDeserialize, pointer::PakTypedPointer};
 
 #[cfg(test)]
 mod test;
@@ -23,6 +24,7 @@ pub mod query;
 pub mod error;
 pub mod pointer;
 pub mod builder;
+pub mod item;
 
 //==============================================================================================
 //        Pak File
@@ -61,7 +63,7 @@ impl Pak {
     
     /// Loads an object from the pak file via queried indices. This will only load the necessary data into memory.
     pub fn query<T>(&self, query : impl PakQueryExpression<T>) -> PakResult<T::ReturnType> where T : DeserializeGroup  {
-        let pointers = query.execute(self)?.into_iter().collect::<HashSet<_>>();
+        let pointers = query.execute(self)?.into_iter().collect::<OrderSet<_>>();
         T::deserialize_group(self, pointers)
     }
     
@@ -103,12 +105,13 @@ impl Pak {
     }
     
     /// Read Data directly with a pointer. 
-    pub fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        self.inner.read_err(pointer)
+    pub fn read<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakDeserialize {
+        self.inner.read(pointer)
     }
     
-    pub fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : for<'de> Deserialize<'de> {
-        self.inner.read(pointer)
+    /// Read Data directly with a pointer. 
+    pub fn read_serde<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
+        self.inner.read_serde(pointer)
     }
     
     pub fn identifier(&self) -> &str {
@@ -143,9 +146,10 @@ impl Pak {
         let lists : HashMap<String, PakPointer> = bincode::deserialize(&lists_buffer)?;
         
         let mut values = Vec::new();
+        drop(source);
         for type_name in T::get_types() {
             let Some(list_pointer) = lists.get(type_name) else { continue };
-            let list = self.inner.read_internal::<Vec<PakPointer>>(list_pointer, &mut source)?;
+            let list = self.inner.read_serde::<Vec<PakPointer>>(list_pointer)?;
             list.iter()
                 .map(|pointer| PakTypedPointer::new(pointer.offset(), pointer.size(), type_name).into_pointer())
                 .for_each(|pointer| values.push(pointer));
@@ -167,27 +171,27 @@ impl Pak {
 //        PakInner
 //==============================================================================================
 
-pub(crate) struct PakInner {
+pub struct PakInner {
     sizing : PakSizing,
     meta : PakMeta,
     source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>,
 }
 
 impl PakInner {
-    fn read_err<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
+    pub fn read<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakDeserialize {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
+        T::unpak(self, pointer)
+    }
+    
+    pub fn read_serde<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
+        if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
+        let buffer = self.read_raw(pointer)?;
+        Ok(bincode::deserialize(buffer.as_slice())?)
+    }
+    
+    pub fn read_raw(&self, pointer : &PakPointer) -> PakResult<Vec<u8>> {
         let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
-        self.read_internal(pointer, &mut source)
-    }
-    
-    fn read<T>(&self, pointer : &PakPointer) -> Option<T> where T : for<'de> Deserialize<'de> {
-        self.read_err::<T>(pointer).ok()
-    }
-    
-    fn read_internal<T>(&self, pointer : &PakPointer, source : &mut RwLockWriteGuard<Box<dyn PakSource + Send + Sync + 'static>>) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        let buffer = source.read(pointer, self.get_vault_start())?;
-        let res = bincode::deserialize(&buffer)?;
-        Ok(res)
+        source.read(pointer, self.get_vault_start())
     }
     
     fn get_vault_start(&self) -> u64 {
