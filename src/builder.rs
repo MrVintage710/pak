@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor}, path::Path, sync::{Arc, RwLock}};
+use std::{collections::HashMap, fmt::Debug, fs::{self, File}, io::{BufReader, Cursor}, path::Path, sync::RwLock};
 
 
 use serde::{Serialize};
 
-use crate::{PAK_FILE_VERSION, Pak, PakInner, btree::PakTreeBuilder, error::PakResult, index::{Indices, PakIndex}, item::PakSerialize, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
+use crate::{PAK_FILE_VERSION, Pak, btree::PakTreeBuilder, error::PakResult, index::{Indices, PakIndex}, item::PakSerialize, meta::{PakMeta, PakSizing}, pointer::{PakPointer, PakUntypedPointer}};
 
 //==============================================================================================
 //        PakBuilder
@@ -127,24 +127,22 @@ impl PakBuilder {
         let (out, sizing, meta) = self.build_internal()?;
         
         fs::write(&path, out)?;
-        let inner = Arc::new(PakInner {
+        let pak  = Pak { 
             sizing,
             meta,
-            source: RwLock::new(Box::new(BufReader::new(File::open(path)?))),
-        });
-        let pak  = Pak { inner };
+            source: RwLock::new(Box::new(BufReader::new(File::open(path)?))), 
+        };
         Ok(pak)
     }
     
     /// Builds the pak file and writes it to the specified path. This also returns a [Pak](crate::Pak) object that is attached to that slice of memory.
     pub fn build_in_memory(self) -> PakResult<Pak> {
         let (out, sizing, meta) = self.build_internal()?;
-        let inner = Arc::new(PakInner {
+        let pak = Pak { 
             sizing,
             meta,
             source: RwLock::new(Box::new(Cursor::new(out))),
-        });
-        let pak = Pak { inner };
+        };
         Ok(pak)
     }
     

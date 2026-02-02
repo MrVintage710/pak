@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PakInner, builder::PakBuilder, error::PakResult, index::{Indices, PakSearchable}, pointer::PakPointer};
+use crate::{Pak, builder::PakBuilder, error::PakResult, index::{Indices, PakSearchable}, pointer::PakPointer};
 
 pub trait PakSerialize {   
     fn pak(&self, pak : &mut PakBuilder) -> PakResult<PakPointer>;
@@ -15,11 +15,11 @@ impl <T> PakSerialize for T where T : Serialize + PakSearchable {
 }
 
 pub trait PakDeserialize : Sized {
-    fn unpak(pak : &PakInner, pointer : &PakPointer) -> PakResult<Self>;
+    fn unpak(pak : &Pak, pointer : &PakPointer) -> PakResult<Self>;
 }
 
 impl <T> PakDeserialize for T where T : for<'de> Deserialize<'de> {
-    fn unpak(pak : &PakInner, pointer : &PakPointer) -> PakResult<Self> {
+    fn unpak(pak : &Pak, pointer : &PakPointer) -> PakResult<Self> {
         pak.read_serde(pointer)
     }
 } 

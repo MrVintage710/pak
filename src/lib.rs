@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/MrVintage710/pak/refs/heads/main/docs/icon.png")]
 
-use std::{collections::HashMap, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::{Arc, RwLock, Weak}};
+use std::{collections::HashMap, fs::File, io::{BufReader, Read, Seek, SeekFrom}, path::Path, sync::RwLock};
 use btree::PakTree;
 use group::{DeserializeGroup};
 use meta::{PakMeta, PakSizing};
@@ -36,7 +36,9 @@ pub const PAK_SIZING_STRUCT_SIZE_IN_BYTES : u64 = 32;
 
 /// Represents a Pak file. This struct provides access to the metadata and data stored within the Pak file.
 pub struct Pak {
-    inner : Arc<PakInner>
+    sizing : PakSizing,
+    meta : PakMeta,
+    source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>,
 }
 
 impl Pak {
@@ -49,10 +51,8 @@ impl Pak {
         let meta_pointer = PakPointer::new_untyped(PAK_SIZING_STRUCT_SIZE_IN_BYTES, sizing.meta_size);
         let meta_buffer = source.read(&meta_pointer, 0)?;
         let meta : PakMeta = bincode::deserialize(&meta_buffer)?;
-        
-        let inner = Arc::new(PakInner { sizing, source : RwLock::new(Box::new(source)), meta });
 
-        Ok(Self { inner })
+        Ok(Pak { sizing, meta, source : RwLock::new(Box::new(source))})
     }
     
     /// Loads a Pak from the specified file path. This will not load the entire pak file into memory, just the header.
@@ -73,111 +73,6 @@ impl Pak {
         self.query::<T>(query)
     }
     
-    /// Returns the size of the pak file in bytes.
-    pub fn size(&self) -> u64 {
-        24 + self.inner.sizing.meta_size + self.inner.sizing.indices_size + self.inner.sizing.vault_size
-    }
-    
-    /// Returns the name given to the pak file.
-    pub fn name(&self) -> &str {
-        &self.inner.meta.name
-    }
-    
-    /// Returns the version of the pak file.
-    pub fn version(&self) -> &str {
-        &self.inner.meta.version
-    }
-    
-    /// Returns the author of the pak file.
-    pub fn author(&self) -> &str {
-        &self.inner.meta.author
-    }
-    
-    /// Returns the description of the pak file.
-    pub fn description(&self) -> &str {
-        &self.inner.meta.description
-    }
-    
-    /// This returns the extra data that can be saved in the metadata. This can throw an error if the
-    /// wrong type is asked for.
-    pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        self.inner.meta.get_extra()
-    }
-    
-    /// Read Data directly with a pointer. 
-    pub fn read<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakDeserialize {
-        self.inner.read(pointer)
-    }
-    
-    /// Read Data directly with a pointer. 
-    pub fn read_serde<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : for<'de> Deserialize<'de> {
-        self.inner.read_serde(pointer)
-    }
-    
-    pub fn identifier(&self) -> &str {
-        &self.inner.meta.identifier
-    }
-    
-    pub(crate) fn weak(&self) -> Weak<PakInner> {
-        Arc::downgrade(&self.inner)
-    }
-    
-    pub fn check_identifier(&self, id : &str) -> PakResult<()> {
-        if self.identifier() != id { return Err(error::PakError::PakIdentifierMismatch)}
-        Ok(())
-    }
-    
-    pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree<'_>> {
-        PakTree::new(self, key)
-    }
-    
-    pub(crate) fn fetch_indices(&self) -> PakResult<HashMap<String, PakUntypedPointer>> {
-        let pointer = PakPointer::new_untyped(self.get_indices_start(), self.inner.sizing.indices_size);
-        let Ok(mut source) = self.inner.source.write() else { return Err(error::PakError::SourceInUse) };
-        let buffer = source.read(&pointer, 0)?;
-        let indices = bincode::deserialize(&buffer)?;
-        Ok(indices)
-    }
-    
-    pub(crate) fn fetch_all_pointers_of<T>(&self) -> PakResult<Vec<PakPointer>> where T : DeserializeGroup {
-        let Ok(mut source) = self.inner.source.write() else { return Err(error::PakError::SourceInUse) };
-        let lists_pointer = PakPointer::new_untyped(self.get_list_start(), self.inner.sizing.list_size);
-        let lists_buffer = source.read(&lists_pointer, 0)?;
-        let lists : HashMap<String, PakPointer> = bincode::deserialize(&lists_buffer)?;
-        
-        let mut values = Vec::new();
-        drop(source);
-        for type_name in T::get_types() {
-            let Some(list_pointer) = lists.get(type_name) else { continue };
-            let list = self.inner.read_serde::<Vec<PakPointer>>(list_pointer)?;
-            list.iter()
-                .map(|pointer| PakTypedPointer::new(pointer.offset(), pointer.size(), type_name).into_pointer())
-                .for_each(|pointer| values.push(pointer));
-        }
-        
-        Ok(values)
-    }
-    
-    pub(crate) fn get_list_start(&self) -> u64 {
-        self.inner.get_list_start()
-    }
-    
-    pub(crate) fn get_indices_start(&self) -> u64 {
-        self.inner.get_indices_start()
-    }
-}
-
-//==============================================================================================
-//        PakInner
-//==============================================================================================
-
-pub struct PakInner {
-    sizing : PakSizing,
-    meta : PakMeta,
-    source : RwLock<Box<dyn PakSource + Send + Sync + 'static>>,
-}
-
-impl PakInner {
     pub fn read<T>(&self, pointer : &PakPointer) -> PakResult<T> where T : PakDeserialize {
         if !pointer.type_is_match::<T>() { return Err(error::PakError::TypeMismatchError(pointer.type_name().to_string(), std::any::type_name::<T>().to_string())) }
         T::unpak(self, pointer)
@@ -205,6 +100,77 @@ impl PakInner {
     
     fn get_indices_start(&self) -> u64 {
         PAK_SIZING_STRUCT_SIZE_IN_BYTES + self.sizing.meta_size
+    }
+    
+    /// Returns the size of the pak file in bytes.
+    pub fn size(&self) -> u64 {
+        24 + self.sizing.meta_size + self.sizing.indices_size + self.sizing.vault_size
+    }
+    
+    /// Returns the name given to the pak file.
+    pub fn name(&self) -> &str {
+        &self.meta.name
+    }
+    
+    /// Returns the version of the pak file.
+    pub fn version(&self) -> &str {
+        &self.meta.version
+    }
+    
+    /// Returns the author of the pak file.
+    pub fn author(&self) -> &str {
+        &self.meta.author
+    }
+    
+    /// Returns the description of the pak file.
+    pub fn description(&self) -> &str {
+        &self.meta.description
+    }
+    
+    /// This returns the extra data that can be saved in the metadata. This can throw an error if the
+    /// wrong type is asked for.
+    pub fn get_extra<T>(&self) -> PakResult<T> where T : for<'de> Deserialize<'de> {
+        self.meta.get_extra()
+    }
+    
+    pub fn identifier(&self) -> &str {
+        &self.meta.identifier
+    }
+    
+    pub fn check_identifier(&self, id : &str) -> PakResult<()> {
+        if self.identifier() != id { return Err(error::PakError::PakIdentifierMismatch)}
+        Ok(())
+    }
+    
+    pub(crate) fn get_tree(&self, key : &str) -> PakResult<PakTree<'_>> {
+        PakTree::new(self, key)
+    }
+    
+    pub(crate) fn fetch_indices(&self) -> PakResult<HashMap<String, PakUntypedPointer>> {
+        let pointer = PakPointer::new_untyped(self.get_indices_start(), self.sizing.indices_size);
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
+        let buffer = source.read(&pointer, 0)?;
+        let indices = bincode::deserialize(&buffer)?;
+        Ok(indices)
+    }
+    
+    pub(crate) fn fetch_all_pointers_of<T>(&self) -> PakResult<Vec<PakPointer>> where T : DeserializeGroup {
+        let Ok(mut source) = self.source.write() else { return Err(error::PakError::SourceInUse) };
+        let lists_pointer = PakPointer::new_untyped(self.get_list_start(), self.sizing.list_size);
+        let lists_buffer = source.read(&lists_pointer, 0)?;
+        let lists : HashMap<String, PakPointer> = bincode::deserialize(&lists_buffer)?;
+        
+        let mut values = Vec::new();
+        drop(source);
+        for type_name in T::get_types() {
+            let Some(list_pointer) = lists.get(type_name) else { continue };
+            let list = self.read_serde::<Vec<PakPointer>>(list_pointer)?;
+            list.iter()
+                .map(|pointer| PakTypedPointer::new(pointer.offset(), pointer.size(), type_name).into_pointer())
+                .for_each(|pointer| values.push(pointer));
+        }
+        
+        Ok(values)
     }
 }
 
